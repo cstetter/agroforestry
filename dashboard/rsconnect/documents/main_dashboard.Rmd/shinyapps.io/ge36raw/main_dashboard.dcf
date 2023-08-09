@@ -1,0 +1,13 @@
+name: main_dashboard
+title: main_dashboard
+username:
+account: ge36raw
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 5596855
+bundleId: 5671868
+url: https://ge36raw.shinyapps.io/main_dashboard/
+when: 1647008493.76917
+lastSyncTime: 1647008493.76917
+asMultiple: FALSE
+asStatic: FALSE

@@ -1,0 +1,1173 @@
+---
+title: "Farmers' preferences for tackling climate change: the case of agroforestry in Southeast Germany"
+author: "Christian Stetter"
+date: "1/8/2021"
+output: html_document
+---
+
+# 1. Load libraries
+
+```{r load libraries, include=FALSE}
+set.seed(3)
+
+library(readr)
+library(dplyr)
+library(support.CEs)
+library(survival)
+library(data.table)
+library(mlogit)
+library(broom)
+```
+
+# 2. Data
+## Prepare weather variables with different lag structure (Ramsey AJAE 2021)
+```{r warning=FALSE}
+df <- readRDS("C:/Users/cstetter/OneDrive - ETH Zurich/01_save_d/weather_data/choice_data/fd_weather_plz1.rds")
+
+# df <- readRDS("C:/Users/Christian/OneDrive - ETH Zurich/01_save_d/weather_data/choice_data/fd_weather_plz1.rds")
+
+colnames(df) <- stringr::str_replace(colnames(df), "ann_", "") 
+old_names <- c("rain", "temp", "dd", "r20", "hd")
+
+df_weather <- cbind(
+## 1-3 lags
+df %>% filter(year>=2017 & year<=2019) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(Group.1, rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c("zip", paste0(old_names, "_1_3" ))),
+
+## 1 lag
+df %>% filter(year==c(2019)) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_1" ))),
+
+## 1-5 lags
+df %>% filter(year>=2015 & year<=2019) %>%
+ aggregate(., by = list(.$plz), FUN = mean, na.rm=T) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)),~ c(paste0(old_names, "_1_5" ))),
+
+## 2-10 lag
+df %>% filter(year>=2010 & year<=2018) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_2_10" ))),
+
+## 2-15 lag
+df %>% filter(year>=2005 & year<=2018) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_2_15" ))),
+
+## 2-20 lag
+df %>% filter(year>=2000 & year<=2018) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_2_20" ))),
+
+
+## 2-25 lag
+df %>% filter(year>=1995 & year<=2018) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_2_25" ))),
+
+
+## 4-10 lag
+df %>% filter(year>=2010 & year<=2016) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_4_10" ))),
+
+## 4-15 lag
+df %>% filter(year>=2005 & year<=2016) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_4_15" ))),
+
+## 4-20 lag
+df %>% filter(year>=2000 & year<=2016) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_4_20" ))),
+
+
+## 4-25 lag
+df %>% filter(year>=1995 & year<=2016) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_4_25" ))),
+
+
+## 6-10 lag
+df %>% filter(year>=2010 & year<=2014) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_6_10" ))),
+
+## 6-15 lag
+df %>% filter(year>=2005 & year<=2014) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_6_15" ))),
+
+## 6-20 lag
+df %>% filter(year>=2000 & year<=2014) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_6_20" ))),
+
+
+## 6-25 lag
+df %>% filter(year>=1995 & year<=2014) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_6_25" ))),
+
+
+## 50 years baseline
+df %>% filter(year>=1971 & year<=2020) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_base" ))),
+
+df %>% filter(year>=1991 & year<=2020) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_base30" ))),
+
+df %>% filter(year==2018) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_drought_year"))),
+
+df %>% filter(year==2003) %>%
+ aggregate(., by = list(.$plz), FUN = mean) %>% 
+ dplyr::select(rain:hd) %>%
+ rename_at(vars(colnames(.)), ~ c(paste0(old_names, "_drought_year2003")))
+)
+```
+
+### Weather plots
+```{r}
+library(tidyverse)
+w <- df %>% group_by(year) %>% select(-plz) %>% summarise_all(median) %>% as.data.frame()
+
+ggDD <- ggplot(data=w, aes(x=year, y=dd)) +
+ geom_line(aes(group=1), size=1.5) + 
+ ggthemes::theme_economist(base_size = 10) + 
+ scale_x_discrete(breaks = scales::pretty_breaks(n=8)) +
+ labs(title = "Dry days per year", subtitle = "Days with precipitation >1mm \nin Bavaria, Germany (1960 - 2020)") +
+ theme(axis.title = element_blank())
+
+ggHD <- ggplot(data=w, aes(x=year, y=hd)) +
+ geom_line(aes(group=1), size=1.5) + 
+ ggthemes::theme_economist(base_size = 10) + 
+ scale_x_discrete(breaks = scales::pretty_breaks(n=8)) +
+ labs(title = "Hot days per year", subtitle = "Days with temperature >30°C \nin Bavaria, Germany (1960 - 2020)") +
+ theme(axis.title = element_blank())
+
+library(patchwork)
+ggW_app <- ggHD + plot_spacer() + ggDD + plot_layout(widths = c(25,2,25))
+
+ggsave(filename = "img/ggW_app.png",ggW_app, 
+       dpi = "print", width = 7, height = 6)
+
+```
+
+## 2.1 Load data
+
+```{r}
+design_matrix <- readRDS("data_field/design_matrix.rds")
+dat <- readRDS("data_field/data_calc.rds") %>%
+  left_join(.,df_weather, by="zip")
+
+## mean-center weather variables 
+start=which(colnames(dat)=="rain_1_3")
+end=which(colnames(dat)=="hd_drought_year")
+for (i in start:end) {
+        dat[[paste0(colnames(dat)[i], "_c")]] <-
+                dat[[i]] - mean(dat[[i]], na.rm = T)
+}
+
+center_weather <- 
+colMeans(dat[,267:336])[
+grepl(c("_1_3"), names(colMeans(dat[,267:336]))) |
+grepl(c("_4_10"), names(colMeans(dat[,267:336])))]
+
+# saveRDS(center_weather,
+#         "D:/weather_data/climate_projections/center_weather.rds")
+```
+
+# 3. Descriptive Statistics
+```{r}
+library(rgdal)
+library(sf)
+library(ggplot2)
+#### Load shape data ####
+shape <- sf::st_read("plz_spatial/plz-3stellig.shp")
+
+## subset only relevant zip codes
+shape <- shape[startsWith(shape$plz, "63") | 
+                startsWith(shape$plz, "8") | 
+                startsWith(shape$plz, "9"),]
+
+shape5 <- sf::st_read("plz_spatial/plz-gebiete.shp")
+shape5 <- shape5[ which(shape5$plz %in% 
+                          dat$location[which(nchar(dat$location)==5)]),]
+
+shape5$note <- NULL
+shapeAll <- rbind(shape, shape5)
+
+shapeAll <- shapeAll %>% 
+ group_by(plz) %>%
+ summarise(geometry = sf::st_union(geometry)) %>%
+ ungroup()
+
+a <- st_centroid(shapeAll)
+
+new <- table(dat$zip) %>% as.data.frame %>% rename(plz=Var1)
+b <- left_join(new, a)
+test <- left_join(shapeAll, b, by="plz")
+
+BYshape <- sf::st_read("BYshape/bayern_ex.shp")[,"SCH"]
+BYshape <- st_transform(BYshape, st_crs(shapeAll))
+BYshapeRB <- sf::st_read("BYshape/regbez_ex.shp")[,"SCH"]
+BYshapeRB <- st_transform(BYshapeRB, st_crs(shapeAll))
+BYshapeBodKLim <- sf::st_read("BYshape/new.gpkg")
+BYshapeBodKLim <- st_transform(BYshapeBodKLim, st_crs(shapeAll))
+
+shapeAll <- st_intersection(shapeAll, BYshape)
+shapeAllRB <- st_join(shapeAll, BYshapeRB, join = st_intersects,
+                    largest=T) %>%
+  mutate(SCH = SCH.y) %>%
+  select(plz, SCH)
+
+
+shapeAll_multi <- st_join(shapeAll, BYshapeRB, join = st_intersects)
+
+colnames(shapeAll_multi)[1] <- colnames(shapeAllRB)[1]  <-"zip"
+
+dat <- left_join(dat, shapeAllRB, by="zip") 
+
+dat <- filter(dat, !is.na(SCH))
+
+b <- b[b$plz %in% dat$zip,] %>% 
+ filter(plz != 635)
+
+colnames(b)[2] <- "Anzahl" 
+ 
+gg_sample_spatial <- ggplot() +
+    geom_sf(data = BYshapeRB, color = gray(.5), alpha=0.2) +
+ geom_point(data = b, color="darkblue", alpha = .5,
+            aes(size = Anzahl, geometry = geometry),
+            stat = "sf_coordinates") +
+ scale_size_continuous(range = c(1, 3), breaks = c(1,3,5,7)) +
+ theme(panel.grid = element_blank(), 
+       axis.title = element_blank(),
+       axis.text = element_blank(),
+       axis.ticks = element_blank(),
+       panel.background = element_blank(),
+       panel.border = element_rect(colour = "black", fill=NA),
+       legend.position=c(.9,.8)) 
+# ggsave("img/gg_sample_spatial.png", gg_sample_spatial, dpi = "print")
+saveRDS(dat, "data/test_app_dat.rds")
+# saveRDS(dat_sim_multi, "data/test_app_dat_multi.rds")
+```
+### Aggregate data (RegBez & Boden-Klima-Räume)
+```{r warning=FALSE}
+df_sim <- df_weather %>% filter(startsWith(zip, "0"))
+colnames(df_sim)[1] <- "ID"
+
+# saveRDS(df_sim, "data/df_sim.rds")
+
+```
+
+
+## 2.1 Prepare data for estimation with mlogit and glmn
+```{r}
+df <- make.dataset(
+respondent.dataset = dat,
+choice.indicators =
+c("q1", "q2", "q3", "q4", "q5","q6", "q7", "q8", "q9", "q10", "q11", "q12"),
+design.matrix = design_matrix)
+
+df$group <- with(df, ifelse( RES == TRUE, ALT, NA))
+setDT(df)[, choice:=mean(group, na.rm = T), by=c("QES", "ID")]
+
+
+df <- as.data.frame(df)
+df[seq(3, nrow(df), 3), c("DB", "DBVar", "ND", "AU", "No") ] <- 
+  matrix(rep(c(400, 15, 3, 0, 1), each = nrow(df)/3), ncol = 5)
+
+df$DBVar_high <- ifelse(df$DBVar == 30, 1, 0)
+df$ND_long <- ifelse(df$ND == 24, 1, 0)
+df$ND_medium <- ifelse(df$ND == 20, 1, 0)
+
+df_mlogit <- reshape(df,
+                     v.names = c("DB", "DBVar", "ND", "AU", "No", "DBVar_high",
+                                 "ND_long", "ND_medium"),
+                     idvar=c("ID", "BLOCK", "QES"),
+                     timevar = "ALT",
+                     direction="wide")
+
+df_mlogit$CHID <- 1:nrow(df_mlogit)
+
+start=which(colnames(df_mlogit)=="DB.1")
+end=which(colnames(df_mlogit)=="ND_medium.3")
+
+
+dfml <- df_mlogit %>% as.data.frame() %>% mlogit.data(chid.var =  "CHID",
+                                                     id.var = "ID", 
+                                                     choice = "choice", 
+                                                     varying = start:end, sep = ".")
+
+dfml$intercept_src <- ifelse(dfml$alt==1, 1, 0)
+dfml$intercept_ac <- ifelse(dfml$alt==2, 1, 0)
+
+
+for (i in c("_1_c", "_1_3_c", "_1_5_c", "_base_c")) {
+ dfml[[paste0('src_rain', i)]] <- dfml$intercept_src * dfml[[paste0('rain', i)]]
+ dfml[[paste0('src_temp', i)]] <- dfml$intercept_src * dfml[[paste0('temp', i)]]
+ dfml[[paste0('src_dd', i)]] <- dfml$intercept_src * dfml[[paste0('dd', i)]]
+ dfml[[paste0('src_r20', i)]] <- dfml$intercept_src * dfml[[paste0('r20', i)]]
+ dfml[[paste0('src_hd', i)]] <- dfml$intercept_src * dfml[[paste0('hd', i)]]
+}
+
+for (j in c("_2_10_c", "_2_15_c", "_2_20_c", "_2_25_c",
+            "_4_10_c", "_4_15_c", "_4_20_c", "_4_25_c", 
+            "_6_10_c", "_6_15_c", "_6_20_c", "_6_25_c")) {
+ dfml[[paste0('src_rain', j)]] <- dfml$intercept_src * dfml[[paste0('rain', j)]]
+ dfml[[paste0('src_temp', j)]] <- dfml$intercept_src * dfml[[paste0('temp', j)]]
+ dfml[[paste0('src_dd', j)]] <- dfml$intercept_src * dfml[[paste0('dd', j)]]
+ dfml[[paste0('src_r20', j)]] <- dfml$intercept_src * dfml[[paste0('r20', j)]]
+ dfml[[paste0('src_hd', j)]] <- dfml$intercept_src * dfml[[paste0('hd', j)]]
+}
+
+
+for (i in c("_1_c", "_1_3_c", "_1_5_c", "_base_c")) {
+ dfml[[paste0('ac_rain', i)]] <- dfml$intercept_ac * dfml[[paste0('rain', i)]]
+ dfml[[paste0('ac_temp', i)]] <- dfml$intercept_ac * dfml[[paste0('temp', i)]]
+ dfml[[paste0('ac_dd', i)]] <- dfml$intercept_ac * dfml[[paste0('dd', i)]]
+ dfml[[paste0('ac_r20', i)]] <- dfml$intercept_ac * dfml[[paste0('r20', i)]]
+ dfml[[paste0('ac_hd', i)]] <- dfml$intercept_ac * dfml[[paste0('hd', i)]]
+}
+
+for (j in c("_2_10_c", "_2_15_c", "_2_20_c", "_2_25_c",
+            "_4_10_c", "_4_15_c", "_4_20_c", "_4_25_c", 
+            "_6_10_c", "_6_15_c", "_6_20_c", "_6_25_c")) {
+ dfml[[paste0('ac_rain', j)]] <- dfml$intercept_ac * dfml[[paste0('rain', j)]]
+ dfml[[paste0('ac_temp', j)]] <- dfml$intercept_ac * dfml[[paste0('temp', j)]]
+ dfml[[paste0('ac_dd', j)]] <- dfml$intercept_ac * dfml[[paste0('dd', j)]]
+ dfml[[paste0('ac_r20', j)]] <- dfml$intercept_ac * dfml[[paste0('r20', j)]]
+ dfml[[paste0('ac_hd', j)]] <- dfml$intercept_ac * dfml[[paste0('hd', j)]]
+}
+
+
+
+# saveRDS(df_mlogit, "data/df_mlogit.rds")
+# saveRDS(dfml, "data/dfml.rds")
+# saveRDS(df, "data/df.rds")
+```
+
+
+# 4. Models
+## 4.1. Conditional logit
+```{r abs change rates 25, eval=FALSE, include=FALSE}
+res_mnl_13_410 <- mlogit(choice ~ DB + DBVar + ND + AU + No |  
+                          rain_1_3_c + 
+                          rain_4_10_c +
+                          temp_1_3_c + 
+                          temp_4_10_c +
+                          dd_1_3_c +
+                          dd_4_10_c +
+                          r20_1_3_c +
+                          r20_4_10_c +
+                          hd_1_3_c +
+                          hd_4_10_c,
+                         data = dfml,
+                         reflevel = 3,  
+                         seed = 1)
+
+saveRDS(res_mnl_13_410, "models/models_new/res_mnl_13_410.rds")
+```
+
+## 4.2. (Un)Correlated MXL
+```{r abs change rates 25, eval=FALSE, include=FALSE}
+res_cor_13_410 <- mlogit(choice ~ DB + DBVar + ND + AU + No |  
+           rain_1_3_c + 
+           rain_4_10_c +
+           temp_1_3_c + 
+           temp_4_10_c +
+           dd_1_3_c +
+           dd_4_10_c +
+           r20_1_3_c +
+           r20_4_10_c +
+           hd_1_3_c +
+           hd_4_10_c,
+         data = dfml, 
+         panel = T, 
+         rpar = c(DB = "ln", DBVar = "n", ND = "n", AU = "n", No = "n",
+                  "(Intercept):1"="n", "(Intercept):2"="n",
+                  "rain_1_3_c:1"="n",
+                  "rain_4_10_c:1"="n",
+                  "temp_1_3_c:1"="n",
+                  "temp_4_10_c:1"="n",
+                  "dd_1_3_c:1"="n",
+                  "dd_4_10_c:1"="n",
+                  "r20_1_3_c:1"="n",
+                  "r20_4_10_c:1"="n",
+                  "hd_1_3_c:1"="n",
+                  "hd_4_10_c:1"="n",
+         
+                  "rain_1_3_c:2"="n",
+                  "rain_4_10_c:2"="n",
+                  "temp_1_3_c:2"="n",
+                  "temp_4_10_c:2"="n",
+                  "dd_1_3_c:2"="n",
+                  "dd_4_10_c:2"="n",
+                  "r20_1_3_c:2"="n",
+                  "r20_4_10_c:2"="n",
+                  "hd_1_3_c:2"="n",
+                  "hd_4_10_c:2"="n"),
+         R = 1000, 
+         correlation =  c("DB", "DBVar", "ND", "AU", "No",
+                          "(Intercept):1", "(Intercept):2"), 
+         halton = NULL, 
+               method = "bhhh",
+               reflevel = 3,
+               iterlim = 2000)
+
+
+saveRDS(res_cor_13_410, "models/models_new/res_cor_13_410.rds")
+
+res_uncor_13_410 <- update(res_cor_13_410, correlation=F)
+saveRDS(res_uncor_13_410, "models/models_new/res_uncor_13_410.rds")
+
+```
+
+# 5. Robustness checks
+## 1, 2-10
+```{r abs change rates 25, eval=FALSE, include=FALSE}
+res_cor_1_210 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_c +
+                          src_rain_2_10_c +
+                          src_temp_1_c +
+                          src_temp_2_10_c +
+                          src_dd_1_c +
+                          src_dd_2_10_c +
+                          src_r20_1_c +
+                          src_r20_2_10_c +
+                          src_hd_1_c +
+                          src_hd_2_10_c +
+                          ac_rain_1_c +
+                          ac_rain_2_10_c +
+                          ac_temp_1_c +
+                          ac_temp_2_10_c +
+                          ac_dd_1_c +
+                          ac_dd_2_10_c +
+                          ac_r20_1_c +
+                          ac_r20_2_10_c +
+                          ac_hd_1_c +
+                          ac_hd_2_10_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_c" = "n",
+                                  "src_rain_2_10_c" = "n",
+                                  "src_temp_1_c" = "n",
+                                  "src_temp_2_10_c" = "n",
+                                  "src_dd_1_c" = "n",
+                                  "src_dd_2_10_c" = "n",
+                                  "src_r20_1_c" = "n",
+                                  "src_r20_2_10_c" = "n",
+                                  "src_hd_1_c" = "n",
+                                  "src_hd_2_10_c" = "n",
+                                  "ac_rain_1_c" = "n",
+                                  "ac_rain_2_10_c" = "n",
+                                  "ac_temp_1_c" = "n",
+                                  "ac_temp_2_10_c" = "n",
+                                  "ac_dd_1_c" = "n",
+                                  "ac_dd_2_10_c" = "n",
+                                  "ac_r20_1_c" = "n",
+                                  "ac_r20_2_10_c" = "n",
+                                  "ac_hd_1_c" = "n",
+                                  "ac_hd_2_10_c" = "n"),
+               R = 1000, 
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_1_210, "models/models_new/res_cor_1_210.rds")
+```
+
+## 1, 2-15
+```{r abs change rates 25, eval=FALSE, include=FALSE}
+res_cor_1_215 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_c +
+                          src_rain_2_15_c +
+                          src_temp_1_c +
+                          src_temp_2_15_c +
+                          src_dd_1_c +
+                          src_dd_2_15_c +
+                          src_r20_1_c +
+                          src_r20_2_15_c +
+                          src_hd_1_c +
+                          src_hd_2_15_c +
+                          ac_rain_1_c +
+                          ac_rain_2_15_c +
+                          ac_temp_1_c +
+                          ac_temp_2_15_c +
+                          ac_dd_1_c +
+                          ac_dd_2_15_c +
+                          ac_r20_1_c +
+                          ac_r20_2_15_c +
+                          ac_hd_1_c +
+                          ac_hd_2_15_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_c" = "n",
+                                  "src_rain_2_15_c" = "n",
+                                  "src_temp_1_c" = "n",
+                                  "src_temp_2_15_c" = "n",
+                                  "src_dd_1_c" = "n",
+                                  "src_dd_2_15_c" = "n",
+                                  "src_r20_1_c" = "n",
+                                  "src_r20_2_15_c" = "n",
+                                  "src_hd_1_c" = "n",
+                                  "src_hd_2_15_c" = "n",
+                                  "ac_rain_1_c" = "n",
+                                  "ac_rain_2_15_c" = "n",
+                                  "ac_temp_1_c" = "n",
+                                  "ac_temp_2_15_c" = "n",
+                                  "ac_dd_1_c" = "n",
+                                  "ac_dd_2_15_c" = "n",
+                                  "ac_r20_1_c" = "n",
+                                  "ac_r20_2_15_c" = "n",
+                                  "ac_hd_1_c" = "n",
+                                  "ac_hd_2_15_c" = "n"),
+               R = 1000, 
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ),
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_1_215, "models/models_new/res_cor_1_215.rds")
+```
+
+
+## 1, 2-20
+```{r abs change rates 25}
+res_cor_1_220 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_c +
+                          src_rain_2_20_c +
+                          src_temp_1_c +
+                          src_temp_2_20_c +
+                          src_dd_1_c +
+                          src_dd_2_20_c +
+                          src_r20_1_c +
+                          src_r20_2_20_c +
+                          src_hd_1_c +
+                          src_hd_2_20_c +
+                          ac_rain_1_c +
+                          ac_rain_2_20_c +
+                          ac_temp_1_c +
+                          ac_temp_2_20_c +
+                          ac_dd_1_c +
+                          ac_dd_2_20_c +
+                          ac_r20_1_c +
+                          ac_r20_2_20_c +
+                          ac_hd_1_c +
+                          ac_hd_2_20_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_c" = "n",
+                                  "src_rain_2_20_c" = "n",
+                                  "src_temp_1_c" = "n",
+                                  "src_temp_2_20_c" = "n",
+                                  "src_dd_1_c" = "n",
+                                  "src_dd_2_20_c" = "n",
+                                  "src_r20_1_c" = "n",
+                                  "src_r20_2_20_c" = "n",
+                                  "src_hd_1_c" = "n",
+                                  "src_hd_2_20_c" = "n",
+                                  "ac_rain_1_c" = "n",
+                                  "ac_rain_2_20_c" = "n",
+                                  "ac_temp_1_c" = "n",
+                                  "ac_temp_2_20_c" = "n",
+                                  "ac_dd_1_c" = "n",
+                                  "ac_dd_2_20_c" = "n",
+                                  "ac_r20_1_c" = "n",
+                                  "ac_r20_2_20_c" = "n",
+                                  "ac_hd_1_c" = "n",
+                                  "ac_hd_2_20_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_1_220, "models/models_new/res_cor_1_220.rds")
+```
+
+
+## 1, 2-25
+```{r abs change rates 25}
+res_cor_1_225 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_c +
+                          src_rain_2_25_c +
+                          src_temp_1_c +
+                          src_temp_2_25_c +
+                          src_dd_1_c +
+                          src_dd_2_25_c +
+                          src_r20_1_c +
+                          src_r20_2_25_c +
+                          src_hd_1_c +
+                          src_hd_2_25_c +
+                          ac_rain_1_c +
+                          ac_rain_2_25_c +
+                          ac_temp_1_c +
+                          ac_temp_2_25_c +
+                          ac_dd_1_c +
+                          ac_dd_2_25_c +
+                          ac_r20_1_c +
+                          ac_r20_2_25_c +
+                          ac_hd_1_c +
+                          ac_hd_2_25_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_c" = "n",
+                                  "src_rain_2_25_c" = "n",
+                                  "src_temp_1_c" = "n",
+                                  "src_temp_2_25_c" = "n",
+                                  "src_dd_1_c" = "n",
+                                  "src_dd_2_25_c" = "n",
+                                  "src_r20_1_c" = "n",
+                                  "src_r20_2_25_c" = "n",
+                                  "src_hd_1_c" = "n",
+                                  "src_hd_2_25_c" = "n",
+                                  "ac_rain_1_c" = "n",
+                                  "ac_rain_2_25_c" = "n",
+                                  "ac_temp_1_c" = "n",
+                                  "ac_temp_2_25_c" = "n",
+                                  "ac_dd_1_c" = "n",
+                                  "ac_dd_2_25_c" = "n",
+                                  "ac_r20_1_c" = "n",
+                                  "ac_r20_2_25_c" = "n",
+                                  "ac_hd_1_c" = "n",
+                                  "ac_hd_2_25_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_1_225, "models/models_new/res_cor_1_225.rds")
+```
+
+
+## 1-3, 4-15
+```{r abs change rates 25}
+res_cor_13_415 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_3_c +
+                          src_rain_4_15_c +
+                          src_temp_1_3_c +
+                          src_temp_4_15_c +
+                          src_dd_1_3_c +
+                          src_dd_4_15_c +
+                          src_r20_1_3_c +
+                          src_r20_4_15_c +
+                          src_hd_1_3_c +
+                          src_hd_4_15_c +
+                          ac_rain_1_3_c +
+                          ac_rain_4_15_c +
+                          ac_temp_1_3_c +
+                          ac_temp_4_15_c +
+                          ac_dd_1_3_c +
+                          ac_dd_4_15_c +
+                          ac_r20_1_3_c +
+                          ac_r20_4_15_c +
+                          ac_hd_1_3_c +
+                          ac_hd_4_15_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_3_c" = "n",
+                                  "src_rain_4_15_c" = "n",
+                                  "src_temp_1_3_c" = "n",
+                                  "src_temp_4_15_c" = "n",
+                                  "src_dd_1_3_c" = "n",
+                                  "src_dd_4_15_c" = "n",
+                                  "src_r20_1_3_c" = "n",
+                                  "src_r20_4_15_c" = "n",
+                                  "src_hd_1_3_c" = "n",
+                                  "src_hd_4_15_c" = "n",
+                                  "ac_rain_1_3_c" = "n",
+                                  "ac_rain_4_15_c" = "n",
+                                  "ac_temp_1_3_c" = "n",
+                                  "ac_temp_4_15_c" = "n",
+                                  "ac_dd_1_3_c" = "n",
+                                  "ac_dd_4_15_c" = "n",
+                                  "ac_r20_1_3_c" = "n",
+                                  "ac_r20_4_15_c" = "n",
+                                  "ac_hd_1_3_c" = "n",
+                                  "ac_hd_4_15_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_13_415, "models/models_new/res_cor_13_415.rds")
+```
+
+
+## 1-3, 4-20
+```{r abs change rates 25}
+res_cor_13_420 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_3_c +
+                          src_rain_4_20_c +
+                          src_temp_1_3_c +
+                          src_temp_4_20_c +
+                          src_dd_1_3_c +
+                          src_dd_4_20_c +
+                          src_r20_1_3_c +
+                          src_r20_4_20_c +
+                          src_hd_1_3_c +
+                          src_hd_4_20_c +
+                          ac_rain_1_3_c +
+                          ac_rain_4_20_c +
+                          ac_temp_1_3_c +
+                          ac_temp_4_20_c +
+                          ac_dd_1_3_c +
+                          ac_dd_4_20_c +
+                          ac_r20_1_3_c +
+                          ac_r20_4_20_c +
+                          ac_hd_1_3_c +
+                          ac_hd_4_20_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_3_c" = "n",
+                                  "src_rain_4_20_c" = "n",
+                                  "src_temp_1_3_c" = "n",
+                                  "src_temp_4_20_c" = "n",
+                                  "src_dd_1_3_c" = "n",
+                                  "src_dd_4_20_c" = "n",
+                                  "src_r20_1_3_c" = "n",
+                                  "src_r20_4_20_c" = "n",
+                                  "src_hd_1_3_c" = "n",
+                                  "src_hd_4_20_c" = "n",
+                                  "ac_rain_1_3_c" = "n",
+                                  "ac_rain_4_20_c" = "n",
+                                  "ac_temp_1_3_c" = "n",
+                                  "ac_temp_4_20_c" = "n",
+                                  "ac_dd_1_3_c" = "n",
+                                  "ac_dd_4_20_c" = "n",
+                                  "ac_r20_1_3_c" = "n",
+                                  "ac_r20_4_20_c" = "n",
+                                  "ac_hd_1_3_c" = "n",
+                                  "ac_hd_4_20_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_13_420, "models/models_new/res_cor_13_420.rds")
+```
+
+
+## 1-3, 4-25
+```{r abs change rates 25}
+res_cor_13_425 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_3_c +
+                          src_rain_4_25_c +
+                          src_temp_1_3_c +
+                          src_temp_4_25_c +
+                          src_dd_1_3_c +
+                          src_dd_4_25_c +
+                          src_r20_1_3_c +
+                          src_r20_4_25_c +
+                          src_hd_1_3_c +
+                          src_hd_4_25_c +
+                          ac_rain_1_3_c +
+                          ac_rain_4_25_c +
+                          ac_temp_1_3_c +
+                          ac_temp_4_25_c +
+                          ac_dd_1_3_c +
+                          ac_dd_4_25_c +
+                          ac_r20_1_3_c +
+                          ac_r20_4_25_c +
+                          ac_hd_1_3_c +
+                          ac_hd_4_25_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_3_c" = "n",
+                                  "src_rain_4_25_c" = "n",
+                                  "src_temp_1_3_c" = "n",
+                                  "src_temp_4_25_c" = "n",
+                                  "src_dd_1_3_c" = "n",
+                                  "src_dd_4_25_c" = "n",
+                                  "src_r20_1_3_c" = "n",
+                                  "src_r20_4_25_c" = "n",
+                                  "src_hd_1_3_c" = "n",
+                                  "src_hd_4_25_c" = "n",
+                                  "ac_rain_1_3_c" = "n",
+                                  "ac_rain_4_25_c" = "n",
+                                  "ac_temp_1_3_c" = "n",
+                                  "ac_temp_4_25_c" = "n",
+                                  "ac_dd_1_3_c" = "n",
+                                  "ac_dd_4_25_c" = "n",
+                                  "ac_r20_1_3_c" = "n",
+                                  "ac_r20_4_25_c" = "n",
+                                  "ac_hd_1_3_c" = "n",
+                                  "ac_hd_4_25_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_13_425, "models/models_new/res_cor_13_425.rds")
+```
+
+
+
+## 1-5, 6-10
+```{r abs change rates 25}
+res_cor_15_610 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_5_c +
+                          src_rain_6_10_c +
+                          src_temp_1_5_c +
+                          src_temp_6_10_c +
+                          src_dd_1_5_c +
+                          src_dd_6_10_c +
+                          src_r20_1_5_c +
+                          src_r20_6_10_c +
+                          src_hd_1_5_c +
+                          src_hd_6_10_c +
+                          ac_rain_1_5_c +
+                          ac_rain_6_10_c +
+                          ac_temp_1_5_c +
+                          ac_temp_6_10_c +
+                          ac_dd_1_5_c +
+                          ac_dd_6_10_c +
+                          ac_r20_1_5_c +
+                          ac_r20_6_10_c +
+                          ac_hd_1_5_c +
+                          ac_hd_6_10_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_5_c" = "n",
+                                  "src_rain_6_10_c" = "n",
+                                  "src_temp_1_5_c" = "n",
+                                  "src_temp_6_10_c" = "n",
+                                  "src_dd_1_5_c" = "n",
+                                  "src_dd_6_10_c" = "n",
+                                  "src_r20_1_5_c" = "n",
+                                  "src_r20_6_10_c" = "n",
+                                  "src_hd_1_5_c" = "n",
+                                  "src_hd_6_10_c" = "n",
+                                  "ac_rain_1_5_c" = "n",
+                                  "ac_rain_6_10_c" = "n",
+                                  "ac_temp_1_5_c" = "n",
+                                  "ac_temp_6_10_c" = "n",
+                                  "ac_dd_1_5_c" = "n",
+                                  "ac_dd_6_10_c" = "n",
+                                  "ac_r20_1_5_c" = "n",
+                                  "ac_r20_6_10_c" = "n",
+                                  "ac_hd_1_5_c" = "n",
+                                  "ac_hd_6_10_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_15_610, "models/models_new/res_cor_15_610.rds")
+```
+
+## 1-5, 6-15
+```{r abs change rates 25}
+res_cor_15_615 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_5_c +
+                          src_rain_6_15_c +
+                          src_temp_1_5_c +
+                          src_temp_6_15_c +
+                          src_dd_1_5_c +
+                          src_dd_6_15_c +
+                          src_r20_1_5_c +
+                          src_r20_6_15_c +
+                          src_hd_1_5_c +
+                          src_hd_6_15_c +
+                          ac_rain_1_5_c +
+                          ac_rain_6_15_c +
+                          ac_temp_1_5_c +
+                          ac_temp_6_15_c +
+                          ac_dd_1_5_c +
+                          ac_dd_6_15_c +
+                          ac_r20_1_5_c +
+                          ac_r20_6_15_c +
+                          ac_hd_1_5_c +
+                          ac_hd_6_15_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_5_c" = "n",
+                                  "src_rain_6_15_c" = "n",
+                                  "src_temp_1_5_c" = "n",
+                                  "src_temp_6_15_c" = "n",
+                                  "src_dd_1_5_c" = "n",
+                                  "src_dd_6_15_c" = "n",
+                                  "src_r20_1_5_c" = "n",
+                                  "src_r20_6_15_c" = "n",
+                                  "src_hd_1_5_c" = "n",
+                                  "src_hd_6_15_c" = "n",
+                                  "ac_rain_1_5_c" = "n",
+                                  "ac_rain_6_15_c" = "n",
+                                  "ac_temp_1_5_c" = "n",
+                                  "ac_temp_6_15_c" = "n",
+                                  "ac_dd_1_5_c" = "n",
+                                  "ac_dd_6_15_c" = "n",
+                                  "ac_r20_1_5_c" = "n",
+                                  "ac_r20_6_15_c" = "n",
+                                  "ac_hd_1_5_c" = "n",
+                                  "ac_hd_6_15_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_15_615, "models/models_new/res_cor_15_615.rds")
+```
+
+
+## 1-5, 6-20
+```{r abs change rates 25}
+res_cor_15_620 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_5_c +
+                          src_rain_6_20_c +
+                          src_temp_1_5_c +
+                          src_temp_6_20_c +
+                          src_dd_1_5_c +
+                          src_dd_6_20_c +
+                          src_r20_1_5_c +
+                          src_r20_6_20_c +
+                          src_hd_1_5_c +
+                          src_hd_6_20_c +
+                          ac_rain_1_5_c +
+                          ac_rain_6_20_c +
+                          ac_temp_1_5_c +
+                          ac_temp_6_20_c +
+                          ac_dd_1_5_c +
+                          ac_dd_6_20_c +
+                          ac_r20_1_5_c +
+                          ac_r20_6_20_c +
+                          ac_hd_1_5_c +
+                          ac_hd_6_20_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_5_c" = "n",
+                                  "src_rain_6_20_c" = "n",
+                                  "src_temp_1_5_c" = "n",
+                                  "src_temp_6_20_c" = "n",
+                                  "src_dd_1_5_c" = "n",
+                                  "src_dd_6_20_c" = "n",
+                                  "src_r20_1_5_c" = "n",
+                                  "src_r20_6_20_c" = "n",
+                                  "src_hd_1_5_c" = "n",
+                                  "src_hd_6_20_c" = "n",
+                                  "ac_rain_1_5_c" = "n",
+                                  "ac_rain_6_20_c" = "n",
+                                  "ac_temp_1_5_c" = "n",
+                                  "ac_temp_6_20_c" = "n",
+                                  "ac_dd_1_5_c" = "n",
+                                  "ac_dd_6_20_c" = "n",
+                                  "ac_r20_1_5_c" = "n",
+                                  "ac_r20_6_20_c" = "n",
+                                  "ac_hd_1_5_c" = "n",
+                                  "ac_hd_6_20_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_15_620, "models/models_new/res_cor_15_620.rds")
+```
+
+
+## 1-5, 6-25
+```{r abs change rates 25}
+res_cor_15_625 <- mlogit(choice ~ DB + DBVar + ND + AU + No +  
+                          intercept_src +
+                          intercept_ac +
+                          src_rain_1_5_c +
+                          src_rain_6_25_c +
+                          src_temp_1_5_c +
+                          src_temp_6_25_c +
+                          src_dd_1_5_c +
+                          src_dd_6_25_c +
+                          src_r20_1_5_c +
+                          src_r20_6_25_c +
+                          src_hd_1_5_c +
+                          src_hd_6_25_c +
+                          ac_rain_1_5_c +
+                          ac_rain_6_25_c +
+                          ac_temp_1_5_c +
+                          ac_temp_6_25_c +
+                          ac_dd_1_5_c +
+                          ac_dd_6_25_c +
+                          ac_r20_1_5_c +
+                          ac_r20_6_25_c +
+                          ac_hd_1_5_c +
+                          ac_hd_6_25_c | 0,
+                          data = dfml, 
+                          panel = T, 
+                         rpar = c("intercept_src" ="n",
+                                  "intercept_ac" = "n",
+                                  "DB" = "ln",
+                                  "DBVar" = "n",
+                                  "ND" = "n",
+                                  "AU" = "n",
+                                  "No" = "n",
+                                  "src_rain_1_5_c" = "n",
+                                  "src_rain_6_25_c" = "n",
+                                  "src_temp_1_5_c" = "n",
+                                  "src_temp_6_25_c" = "n",
+                                  "src_dd_1_5_c" = "n",
+                                  "src_dd_6_25_c" = "n",
+                                  "src_r20_1_5_c" = "n",
+                                  "src_r20_6_25_c" = "n",
+                                  "src_hd_1_5_c" = "n",
+                                  "src_hd_6_25_c" = "n",
+                                  "ac_rain_1_5_c" = "n",
+                                  "ac_rain_6_25_c" = "n",
+                                  "ac_temp_1_5_c" = "n",
+                                  "ac_temp_6_25_c" = "n",
+                                  "ac_dd_1_5_c" = "n",
+                                  "ac_dd_6_25_c" = "n",
+                                  "ac_r20_1_5_c" = "n",
+                                  "ac_r20_6_25_c" = "n",
+                                  "ac_hd_1_5_c" = "n",
+                                  "ac_hd_6_25_c" = "n"),
+               R = 1000,  
+               correlation = c("DB", "DBVar", "ND", "AU", "No",
+                               "intercept_src", "intercept_ac" ), 
+               halton = NA, 
+               method = "bhhh",
+               reflevel = 3, 
+               seed = 3)
+
+saveRDS(res_cor_15_625, "models/models_new/res_cor_15_625.rds")
+```

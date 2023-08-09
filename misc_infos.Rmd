@@ -1,0 +1,987 @@
+---
+title: "table_scenarios"
+author: "Christian Stetter"
+date: "12/20/2021"
+output: html_document
+---
+```{r}
+library(kableExtra)
+library(tidyverse)
+```
+
+```{r}
+df_sim <- readRDS("data/df_sim.rds")
+
+tb_lta <- df_sim %>% 
+  dplyr::filter(startsWith(ID, "0")) %>%
+  select(ID,ends_with("base30"))
+
+tb_2018 <- df_sim %>% 
+  dplyr::filter(startsWith(ID, "0")) %>% 
+  select(ID,ends_with("drought_year")) 
+
+tb_2003 <- df_sim %>% 
+  dplyr::filter(startsWith(ID, "0")) %>% 
+  select(ID,ends_with("drought_year2003")) 
+
+colnames(tb_lta)[-1] <- colnames(tb_2018)[-1] <- colnames(tb_2003)[-1] <- 
+ str_sub(colnames(tb_lta)[-1], 1, -8)
+
+tb_diff <- cbind(tb_lta[[1]],
+sapply(2:6, function(i) 
+ tb_2018[[i]] -tb_lta[[i]]) %>%
+ as.data.frame())
+
+
+tb_diff2003 <- cbind(tb_lta[[1]],
+sapply(2:6, function(i) 
+ tb_2003[[i]] -tb_lta[[i]]) %>%
+ as.data.frame())
+colnames(tb_diff) <- colnames(tb_diff2003) <- colnames(tb_lta)
+
+
+
+tb_ <- rbind(tb_lta, tb_2018, tb_diff, tb_2003, tb_diff2003) %>% 
+ subset(ID=="09") %>% 
+ # arrange(ID) %>% 
+ mutate_if(is.numeric, round, 2)
+
+tb_$ID<- c("Long-term average (baseline)",
+               "Extreme weather year (2018)",
+               "Difference to baseline",
+               "Extreme weather year (2003)",
+               "Difference to baseline")
+
+colnames(tb_) <- c("", "Precipitation (mm/year)",
+                  "Average Temp. (°C)",
+                  "Dry days",
+                  "Heavy rain days",
+                  "Hot days")
+
+c("", "Precipitation (mm/year)",
+                  "Mean Temper-ature (°C)",
+                  "Dry days (No. of days w/ < 1mm precipitation)",
+                  "Heavy rain days (No. of days w/ >20mm precipitation)",
+                  "Hot days (No. of days with max. temperature >30°C)")
+
+```
+
+```{r}
+library(kableExtra)
+tab <- kbl(tb_, booktabs = T, format = "latex", 
+           label = "des_weather_post_est",
+           caption = "Description of the weather indicators as they enter the 2018-like shock simulations.",row.names = F)  %>%
+  pack_rows("", 1,1)  %>%
+ pack_rows("", 2, 3)  %>%
+ pack_rows("", 4, 5) %>%
+  # pack_rows("Lower Bavaria", 7, 9) %>%
+  # pack_rows("Upper Palatinate", 10, 12) %>%
+  # pack_rows("Upper Franconia", 13, 15) %>%
+  # pack_rows("Middle Franconia", 16, 18) %>%
+  # pack_rows("Lower Franconia", 19, 21) %>%
+  # pack_rows("Swabia", 22, 24) %>%
+kable_styling(full_width = T, ,font_size = 10) %>%
+column_spec(1, width = "4.8cm")
+
+save_kable(tab, "tables/sim_summary.tex", keep_tex = F)
+```
+
+```{r}
+mat_s <- data.frame(
+ Scenario = c("1. Regular-case",
+              "2. Regular-case w/ policy support",
+              "3. Regular-case w/ technological improvement",
+              "4. Mid-case for agroforestry",
+              "5. Best-case for agroforestry"),
+ AC_DB = c(400, 400, 400, 600, 800),
+ AC_DBVar= c(30,30,30,22.5,15),
+ AC_Duruse= c(24,24,16,20,16),
+ AC_AES= c(0,200,0,100,200),
+ AC_NoGreen= c("No", "Yes", "No", "Yes", "Yes"),
+ SRC_DB = c(400, 400, 400, 600, 800),
+ SRC_DBVar= c(30,30,30,22.5,15),
+ SRC_Duruse= c(24,24,16,20,16),
+ SRC_AES= c(0,200,0,100,200),
+ SRC_NoGreen= c("No", "Yes", "No", "Yes", "Yes"),
+  SQ_DB = rep(400,5),
+ SQ_DBVar= rep(15,5),
+ SQ_Duruse= rep(3, 5),
+ SQ_AES= rep(0,5),
+ SQ_NoGreen= rep("No",5)
+)
+
+colnames(mat_s) <- c("Scenario", 
+                     rep(c("MC", "MC V", "MU L", "PE S", "Gre-en"), 3))
+```
+
+
+```{r}
+tab <- kbl(mat_s, booktabs = T, format = "latex", 
+           label = "des_sim_scenarios",
+           caption = "Description of the simulation scenarios and corresponding attribute values.",
+           escape = FALSE)  %>%
+ kable_styling(full_width = T, font_size =10) %>%
+ column_spec(1, width = "3cm") %>%
+ add_header_above(c(" " = 1, "Alley-Cropping" = 5, "Short Rotation Coppice" = 5, 
+                    "Status Quo" = 5))  %>% 
+ footnote(general_title = "", footnote_as_chunk = T,
+          general = "area eligible for greening premium")  %>%
+ footnote(general_title = "", footnote_as_chunk = T,
+          general = "useful lifetime (years), PES = Payments for environmental services (Euro), Green = Cultivated") %>%
+ footnote(general_title = "Note:", footnote_as_chunk = T,
+          # threeparttable = TRUE,
+          general = "MC = Margin contribution (Euro), MCV = margin contribution variation (%), MUL = Minimum ") 
+
+save_kable(tab, "tables/sim_scenarios.tex", keep_tex = F)
+```
+
+
+
+```{r map}
+library(sf)
+library(spData)
+library(ggplot2)
+library(cowplot)
+library(rcartocolor)
+
+
+Bshape <- st_union(BYshape)
+b <- st_bbox(Bshape)
+
+p1 <-ggplot()+
+  geom_sf(data = EUmap, fill = NA, 
+          size = 0.5)  +
+  geom_sf(data = Bshape, size = 0.2, alpha=0.1) +
+  scale_color_viridis_c() +
+ annotate("rect", xmin = b["xmin"], xmax = b["xmax"], ymin = b["ymin"], ymax = b["ymax"],
+           colour = "black", fill = "transparent", size = 1) +
+  geom_sf_text(
+   data = EUmap[EUmap$NUTS_ID %in% c("DE", "ES", "FR", "IT", "NL", "PL", "SE", "UK"),], 
+   aes(label = NUTS_ID), size=3.5 ) +
+ theme_void(base_size = 16) +
+  theme(axis.text = element_blank(),
+        panel.background = element_rect(size = 0.6)) 
+
+ByCrop <- st_union(st_crop(EUmap, b))
+
+p2 <- ggplot()+
+ geom_sf(data = BYshape, aes(fill=SCH), alpha=0.4, color="black") +
+ geom_sf(data = ByCrop, fill = NA, color="black", size=1)  +
+ scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0)) +
+ scale_color_viridis_c() +
+ theme_void(base_size = 16)  +
+ theme(axis.text = element_blank(),
+       legend.position = "bottom",
+       legend.direction = 'vertical') +
+ guides(fill = guide_legend(title = "District",
+                            title.position = "top", title.align=0.5,
+                            label.position = "bottom", size=1.5, nrow = 3)) +
+ scale_fill_manual(values=brewer.pal(n=7, "Dark2"),
+                   labels =str_wrap(c("Upper Bavaria",
+                             "Lower Bavaria",
+                             "Upper Palatinate",
+                             "Upper Franconia",
+                             "Middle Franconia",
+                             "Lower Franconia",
+                             "Swabia")), 10)+
+ ggtitle("Bavaria")
+
+
+# map
+gg_inset_map1 = cowplot::ggdraw() +
+  coord_equal(xlim = c(0, 40), ylim = c(0, 20), expand = FALSE) +
+  annotation_custom(ggplotGrob(p1), xmin = 0, xmax = 20, ymin = 0, ymax =20) +
+  annotation_custom(ggplotGrob(p2), xmin = 23, xmax = 40, ymin = 0, ymax = 20) +
+  geom_segment(aes(x = 11.3, xend = 26, y = 8.7, yend = 18.7), color = "black", size = 1.2) +
+  geom_segment(aes(x = 11.3, xend = 26, y = 7.12, yend = 7.45), color = "black", size = 1.2)
+
+ggsave(filename = paste0("img/bavaria_map.png"), 
+       plot = gg_inset_map1, dpi="print",
+       width = 14, height = 6)
+```
+
+
+# Load models
+```{r}
+file_list <- list.files("models", full.names = T)[-1]
+
+res_list <- lapply(file_list, function(i) readRDS(file = i))
+names(res_list) <- stringr::str_sub(
+ list.files("models", full.names = F)[-1], 1,-5)
+
+list2env(res_list,globalenv())
+```
+
+
+# Regression output table
+```{r}
+library(broom)
+library(tidyverse)
+
+res_cor_13_410_vcov <- 
+ summary(vcov(res_cor_13_410, what = "rpar", type = "cor"))
+
+res_cor_base_13_410_vcov <- 
+ summary(vcov(res_cor_base_13_410, what = "rpar", type = "cor"))
+
+
+res_cor_13_410_tidy <- rbind(
+ tidy(res_cor_13_410),
+ setNames(
+  as.tibble(cbind(rownames(res_cor_13_410_vcov),
+                  res_cor_13_410_vcov[,1:4])), 
+  names(tidy(res_cor_13_410)))) %>%
+ filter(substr(term,1,1) != "c")
+res_cor_13_410_tidy[,2:5] <- sapply(res_cor_13_410_tidy[,2:5], as.numeric)
+
+
+
+res_cor_base_13_410_tidy <- rbind(
+ tidy(res_cor_base_13_410),
+ setNames(
+  as.tibble(cbind(rownames(res_cor_base_13_410_vcov),
+                  res_cor_base_13_410_vcov[,1:4])), 
+  names(tidy(res_cor_base_13_410)))) %>%
+ filter(substr(term,1,1) != "c")
+res_cor_base_13_410_tidy[,2:5] <- sapply(res_cor_base_13_410_tidy[,2:5], as.numeric)
+
+
+res_mnl_13_410_tidy <- tidy(res_mnl_13_410)
+res_uncor_13_410_tidy <- tidy(res_uncor_13_410)
+
+broom_glance <- function(res_object, cor){
+ glance(res_object)  %>%
+  dplyr::select(logLik, rho2, AIC, nobs)
+}
+
+res_mnl_13_410_glance <- broom_glance(res_object = res_mnl_13_410)
+res_cor_base_13_410_glance <- broom_glance(res_object = res_cor_base_13_410)
+res_uncor_13_410_glance <- broom_glance(res_object = res_uncor_13_410)
+res_cor_13_410_glance <- broom_glance(res_object = res_cor_13_410)
+
+```
+
+```{r}
+extract_broom <- function(tidy, glance, cor){
+texreg::createTexreg(coef.names = tidy$term,
+                     coef = tidy$estimate,
+                     se = tidy$std.error,
+                     pvalues = tidy$p.value,
+                     gof.names = names(glance),
+                     gof = t(glance)[,1],
+                     gof.decimal = c(rep(TRUE,4)))
+}
+
+coef_names <- list(
+ "(Intercept):1"    = "ASC: SRC",
+ "(Intercept):2"    = "ASC: AC",
+ "DB"               = "Returns",
+ "DBVar"            = "Returns variability",
+ "ND"               = "Min. useful lifet.",
+ "AU"               = "PES", 
+ "No"               = "No greening",
+ "rain_1_3_c:1"     = "Rain 1-3:SRC",
+ "rain_1_3_c:2"     = "Rain 1-3:AC",
+ "rain_4_10_c:1"    = "Rain 4-10:SRC",
+ "rain_4_10_c:2"    = "Rain 4-10:AC",
+ "temp_1_3_c:1"     = "Temp. 1-3:SRC",
+ "temp_1_3_c:2"     = "Temp. 1-3:AC",
+ "temp_4_10_c:1"    = "Temp. 4-10:SRC",
+ "temp_4_10_c:2"    = "Temp. 4-10:AC",
+ "dd_1_3_c:1"       = "Dry days 1-3:SRC",
+ "dd_1_3_c:2"       = "Dry days 1-3:AC",
+ "dd_4_10_c:1"      = "Dry days 4-10:SRC",
+ "dd_4_10_c:2"      = "Dry days 4-10:AC",
+ "r20_1_3_c:1"      = "Heavy rain 1-3:SRC",
+ "r20_1_3_c:2"      = "Heavy rain 1-3:AC",
+ "r20_4_10_c:1"     = "Heavy rain 4-10:SRC",
+ "r20_4_10_c:2"     = "Heavy rain 4-10:AC",
+ "hd_1_3_c:1"       = "Hot days 1-3:SRC",
+ "hd_1_3_c:2"       = "Hot days 1-3:AC",
+ "hd_4_10_c:1"      = "Hot days 4-10:SRC",
+ "hd_4_10_c:2"      = "Hot days 4-10:AC",
+ "sd.rain_1_3_c:1"  = "SD Rain 1-3:SRC",
+ "sd.rain_1_3_c:2"  = "SD Rain 1-3:AC",
+ "sd.rain_4_10_c:1" = "SD Rain 4-10:SRC",
+ "sd.rain_4_10_c:2" = "SD Rain 4-10:AC",
+ "sd.temp_1_3_c:1"  = "SD Temp. 1-3:SRC",
+ "sd.temp_1_3_c:2"  = "SD Temp. 1-3:AC",
+ "sd.temp_4_10_c:1" = "SD Temp. 4-10:SRC",
+ "sd.temp_4_10_c:2" = "SD Temp. 4-10:AC",
+ "sd.dd_1_3_c:1"    = "SD Dry days 1-3:SRC",
+ "sd.dd_1_3_c:2"    = "SD Dry days 1-3:AC",
+ "sd.dd_4_10_c:1"   = "SD Dry days 4-10:SRC",
+ "sd.dd_4_10_c:2"   = "SD Dry days 4-10:AC",
+ "sd.r20_1_3_c:1"   = "SD Heavy rain 1-3:SRC",
+ "sd.r20_1_3_c:2"   = "SD Heavy rain 1-3:AC",
+ "sd.r20_4_10_c:1"  = "SD Heavy rain 4-10:SRC",
+ "sd.r20_4_10_c:2"  = "SD Heavy rain 4-10:AC",
+ "sd.hd_1_3_c:1"    = "SD Hot days 1-3:SRC",
+ "sd.hd_1_3_c:2"    = "SD Hot days 1-3:AC",
+ "sd.hd_4_10_c:1"   = "SD Hot days 4-10:SRC",
+ "sd.hd_4_10_c:2"   = "SD Hot days 4-10:AC",
+ "sd.DB"            = "SD Returns",
+ "sd.DBVar"         = "SD Returns variability",
+ "sd.ND"            = "SD Min. useful lifet.",
+ "sd.AU"            = "SD AES",
+ "sd.No"            = "SD No greening",
+ "sd.(Intercept):1" = "SD ASC: SRC",
+ "sd.(Intercept):2" = "SD ASC: AC")
+```
+
+```{r}
+library("texreg")
+model_out <- texreg(
+ list(extract_broom(res_mnl_13_410_tidy, res_mnl_13_410_glance),
+      # extract_broom(res_cor_base_13_410_tidy, res_cor_base_13_410_glance),
+      extract_broom(res_uncor_13_410_tidy, res_uncor_13_410_glance),
+      extract_broom(res_cor_13_410_tidy, res_cor_13_410_glance)
+ ),
+ custom.gof.rows = list("Correlation"=c("-", "No", "Yes"),
+                        " " = c(" ", " ",  " ")),
+ custom.gof.names = c(NA, "Pseudo-R2", NA, "Obs."),
+ file = "tables/reg_table.tex", 
+ single.row = T, 
+ fontsize = "footnotesize",
+ use.packages=FALSE, 
+ booktabs = T, 
+ siunitx = T, 
+ center = T, 
+ no.margin = F,
+ custom.coef.map = coef_names,
+ groups = list("\\textbf{Means}" = 1:27, "\\textbf{Standard deviations}" = 28:54), 
+ stars = c(0.001, 0.01, 0.05, 0.1),
+ symbol = "\\circ",
+ label = "tab:estimation_results",
+ custom.model.names = c("MNL", "uncor. RPL", "cor. RPL"),
+ caption = "Estimation results summary.",
+ caption.above = TRUE
+ )
+```
+
+# Correlation matrix
+```{r}
+tab_cor <- vcov(res_cor_13_410, what = "rpar", type = "cor")[c(6:7, 1:5), c(6:7, 1:5)] 
+
+row.names(tab_cor) <- colnames(tab_cor) <- 
+c("ASC: SRC",
+  "ASC: AC",
+  "Returns",
+  "Returns variability",
+  "Min. useful lifet.",
+  "PES", 
+  "No greening")
+
+
+tab <- kbl(tab_cor,
+           booktabs = T, 
+           format = "latex", 
+           label = "table_cor_matrix",
+           caption = "Parameter correlation matrix of the RPL model.",digits = 2) %>%
+kable_styling(full_width = T, latex_options = "HOLD_position")
+
+save_kable(tab, "tables/cor_matrix.tex", keep_tex = F)
+```
+
+# Robustness checks
+
+```{r}
+rob_list <- res_list[grepl("CR25", names(res_list))]
+
+tab_rob_lags <- as_tibble( 
+ cbind(
+t(glance(res_cor_13_410)[c(1:2,4)]),
+sapply(rob_list, glance)[c(1:2,4),])
+)
+
+tab_rob_lags <- round(sapply(tab_rob_lags, as.numeric), 2)
+
+names_lags <- 
+ c("\\textbf{Selected Model} short-term: 1-3 years,\nlong-term: 4-10 years",
+   "\\textbf{Specification Alt. 1} short-term: 1 year, long-term: 2-10 years",
+   "\\textbf{Specification Alt. 2} short-term: 1 year, long-term: 2-15 years",
+   "\\textbf{Specification Alt. 3} short-term: 1 year, long-term: 2-20 years",
+   "\\textbf{Specification Alt. 4} short-term: 1-3 year, long-term: 4-15 years",
+   "\\textbf{Specification Alt. 5} short-term: 1-3 year, long-term: 4-20 years",
+   "\\textbf{Specification Alt. 6} short-term: 1-5 year, long-term: 6-10 years",
+   "\\textbf{Specification Alt. 7} short-term: 1-5 year, long-term: 6-15 years",
+   "\\textbf{Specification Alt. 8} short-term: 1-5 year, long-term: 6-20 years")
+
+colnames(tab_rob_lags) <- names_lags
+
+
+tab <- kbl(t(tab_rob_lags),
+           booktabs = T, 
+           format = "latex", 
+           label = "table_rob_lags",
+           caption = "Comparison of alternative estimations using 
+           different lag structures",
+           digits = 2,
+           linesep = "\\addlinespace",
+           escape = F,
+           col.names = c("\\textbf{Log Likelihood}", 
+                         "\\textbf{McFadden Pseudo R2}",
+                         "\\textbf{Akaike Information Criterion}")) %>%
+column_spec(1, width = "4.5cm") %>%
+column_spec(2:4, width = "3cm") %>% 
+ kable_styling(latex_options = "HOLD_position")
+
+save_kable(tab, "tables/table_rob_lags.tex", keep_tex = T)
+```
+
+
+
+ 
+```{r}
+mlogit::lrtest(res_uncor_13_410, res_cor_13_410)
+```
+
+# Data descriptives
+```{r}
+dat$AESdummy <- with(dat, ifelse(AESdummy==1, 1,0))
+dat$higher_educ <- with(dat, ifelse(educUni==1|educPhD==1, 1,0))
+
+sdat <-dat %>% 
+ select(FullTime,qLand, share_arable, share_grassland, share_forest, 
+        share_rented_land, organic_dummy, qLabFull, age, higher_educ, AESdummy)
+
+tab_descriptive <- 
+cbind(
+sdat %>%
+ summarise_all(mean, na.rm=T) %>% t,
+
+sdat %>%
+ summarise_all(median, na.rm=T) %>% t,
+
+sdat %>%
+ summarise_all(sd, na.rm=T) %>%t)
+
+tab_descriptive <- round(tab_descriptive, 2)
+tab_descriptive <- cbind(
+ tab_descriptive,
+ c("FullTime20"         = "0.45\\textsuperscript{c}",
+   "qLand20"            = "36.66\\textsuperscript{c}",
+   "share_arable20"     = "65.18\\textsuperscript{c}",
+   "share_grassland20"  = "34.37\\textsuperscript{c}",
+   "share_forest"       = "--",
+   "share_rented_land20"= "51.0\\textsuperscript{c}",
+   "organic_dummy20"    = "0.12\\textsuperscript{c}",
+   "qLabFull20"         = "2.27\\textsuperscript{c}",
+   "age"                = "50.3\\textsuperscript{d}",
+   "higher_educ"        = "--",
+   "AESdummy2020"       = "0.68\\textsuperscript{e}"))
+
+# c https://www.statistikportal.de/de/veroeffentlichungen/landwirtschaftszaehlung-2020
+# e https://www.destatis.de/DE/Themen/Branchen-Unternehmen/Landwirtschaft-Forstwirtschaft-Fischerei/Landwirtschaftliche-Betriebe/_inhalt.html
+# d https://www.lfl.bayern.de/publikationen/informationen/109108/index.php
+
+row.names(tab_descriptive) <-c("Full-time farming (1 if yes, 0 otherwise)",
+                               "Utilized area (ha)",
+                               "Share of cropland (\\%)",
+                               "Share of grassland (\\%)",
+                               "Share of forested land (\\%)",
+                               "Share of rented land (\\%)",
+                               "Workforce (AWU\\textsuperscript{a})",
+                               "Full-time farming (1 if yes, 0 otherwise)",
+                               "Farmer's age (years)",
+                               "Higher education (1 if yes, 0 otherwise)\\textsuperscript{b}",
+                               "Participation in agri-environmental program (1 if yes, 0 otherwise)")
+
+tab <- kbl(tab_descriptive,
+           booktabs = T, 
+           format = "latex", 
+           label = "descriptive_statistics",
+           caption = "Sample description and comparison with the population mean.",
+           # digits = 2,
+           # linesep = "\\addlinespace",
+           escape = F, 
+           row.names = T,
+           col.names = c("Mean", "Median", "SD", "Population Mean" ),
+           align=rep('r', 4)) %>%
+ column_spec(1, width = "6.5cm") %>%
+ add_header_above(c(" ", "Sample" = 3, "Bavaria" = 1)) %>%
+ footnote(general_title = "", footnote_as_chunk = F,
+          general = "\\\\footnotesize{ to having a university degree. Sources: c \\\\citet{Destatis2021b}, d \\\\citet{LfL2015a}, e \\\\citet{Destatis2021a}}",
+          escape = F, threeparttable = F) %>%
+ footnote(general_title = "", footnote_as_chunk = T,escape = F,
+          threeparttable = F,
+          general = "\\\\footnotesize{Note: Number of observations = 198; a AWU denotes annual working units. b Higher education refers}")
+
+ save_kable(tab, "tables/tab_descriptive.tex", keep_tex = T)
+```
+
+
+# Regierungsbezirke description
+```{r}
+waldflaechen2012 <- 
+ read_csv("data_rb_descriptive/agrarstruktur/waldflaechen2012.csv")
+colnames(waldflaechen2012) <- waldflaechen2012[1,]
+waldflaechen2012 <- waldflaechen2012 %>% .[-c(1,2, 11:12),] 
+
+waldflaechen2012 <- data.frame(rb = waldflaechen2012[[1]],
+                               area_ha_forest = c(634339, 360080, 419885, 293257,
+                                           246106, 360068, 291894, 2605628))
+```
+
+```{r}
+gesamtflaeche2012 <- read_csv("data_rb_descriptive/agrarstruktur/gesamtflaeche2012.csv", 
+    skip = 5) %>%
+ .[1:8,]
+
+colnames(gesamtflaeche2012) <- c("SCH", "rb", "area_ar_tot", "area_ha_tot",
+                                 "area_qkm_tot")
+
+waldflaechen <- left_join(gesamtflaeche2012, waldflaechen2012)
+
+waldflaechen$pecentage_forest <- with(waldflaechen, area_ha_forest/area_ha_tot*100)
+```
+
+```{r}
+flaechennutzung <- read_csv("data_rb_descriptive/agrarstruktur/flaechen.csv", 
+    col_names = FALSE, skip = 9) %>% 
+ .[1:8,c(1:4, 6, 8, 10)]
+
+colnames(flaechennutzung) <- c("SCH", "rb", "anzahl_betriebe", "ha_total", "ha_crop",
+                               "ha_permanent", "ha_grassland")
+
+flaechennutzung$ha_per_farm <- with(flaechennutzung, ha_total/anzahl_betriebe)
+flaechennutzung$perc_crop <- with(flaechennutzung, ha_crop/ha_total)
+flaechennutzung$perc_permanent <- with(flaechennutzung, ha_permanent/ha_total)
+flaechennutzung$perc_grassland <- with(flaechennutzung, ha_grassland/ha_total)
+```
+
+```{r groessenklassen}
+groessenklassen <- read_csv("data_rb_descriptive/agrarstruktur/groessenklassen.csv", 
+    skip = 9, col_names = FALSE,)%>% 
+ .[seq(1,15,2),-c(3,4)]
+
+colnames(groessenklassen) <- c("SCH", "rb", "total", "below_5", "5_to_10", "10_to_20", 
+                               "20_to_50", "50_to_100", "100_to_200",
+                               "greater_200")
+
+groessenklassen[,c(4,10)] <- sapply(c(4,10), function(i)
+ as.numeric(groessenklassen[[i]]))
+
+sapply(3:10, function(i) groessenklassen[[i]]/groessenklassen$total) *100
+
+test <- pivot_longer(  cbind(groessenklassen$rb, as.data.frame(sapply(4:10, function(i)
+ groessenklassen[[i]]/groessenklassen$total) *100)),cols = 2:8) 
+
+colnames(test) <- c("rb", "size_class", "percentage")
+
+
+groessen <- data.frame(rb=groessenklassen$rb,
+                       below_10 = with(groessenklassen, (`5_to_10` + below_5) /total *100),
+                       ten_20 = with(groessenklassen, `10_to_20`/total *100),
+                       twenty_50 = with(groessenklassen, `20_to_50`/total *100),
+                       fifty_100 = with(groessenklassen, `50_to_100`/total *100),
+                       greater_100 = with(groessenklassen, (`100_to_200` + greater_200) /total *100)
+                       )
+
+ggplot(data = test, aes(x = size_class, y=percentage)) +
+ geom_col() +
+ facet_wrap(~rb, nrow = 1) +
+ theme_bw()
+
+gg_groessen <-lapply(unique(test$rb), function(i)
+test %>% 
+ filter(rb==i) %>% 
+ ggplot(aes(x = size_class, y=percentage)) +
+ geom_col() +
+ theme_bw()
+)
+
+```
+
+```{r}
+hofnachfolge <- read_csv("data_rb_descriptive/agrarstruktur/hofnachfolge.csv", 
+    skip = 11) %>% 
+ .[1:8,]
+
+colnames(hofnachfolge) <- c("SCH", "rb", "total", "yes", "no")
+
+hofnachfolge$percentage_yes <- with(hofnachfolge, yes/total)
+```
+
+```{r}
+library(readxl)
+
+rechtsformen <- read_excel("data_rb_descriptive/agrarstruktur/rechtsformen.xlsx", 
+    range = "A6:H14") %>% select(1,2,6:8)
+
+colnames(rechtsformen) <- c("SCH", "rb", "total", "full_time", "part_time")
+
+rechtsformen$percentage_full_time <- with(rechtsformen, full_time/total)
+```
+
+```{r}
+tierbestand <- read_csv("data_rb_descriptive/agrarstruktur/tierbestand.csv", 
+    skip = 9) %>% 
+ .[1:8,c(1:3,5, 8, 10)]
+
+colnames(tierbestand) <- c("SCH", "rb", "no_farms_with_lu", "lu_total",
+                           "no_dairy_cows", "no_pigs")
+
+tierbestand$lu_total/flaechennutzung$ha_total
+tierbestand$no_dairy_cows
+tierbestand$no_pigs
+
+```
+
+```{r}
+bevoelkerung <- read_excel("data_rb_descriptive/population/bevoelkerung.xlsx", 
+    range = "A5:L12", col_names = FALSE) %>% 
+ select(1,2,12)
+
+colnames(bevoelkerung) <- c("SCH", "rb", "pop")
+
+
+gesamtflaeche2021 <- read_excel("data_rb_descriptive/agrarstruktur/gesamtflaeche2021.xlsx", range = "A5:E13")
+
+colnames(gesamtflaeche2021) <- c("SCH", "rb", "area_ar_tot", "area_ha_tot",
+                                 "area_qkm_tot")
+
+bevoelkerung$pop/gesamtflaeche2021$area_ha_tot
+```
+
+```{r}
+eigentumsverhaeltnisse <- read_excel("data_rb_descriptive/agrarstruktur/eigentumsverhaeltnisse.xlsx", 
+    range = "A8:M15", col_names = FALSE) %>% 
+ select(1,2,7,10,11)
+
+colnames(eigentumsverhaeltnisse) <- c("SCH", "rb", "own", "rented", "rental_price")
+
+```
+
+# Natural environment
+```{r}
+elevation <- raster::raster("data_rb_descriptive/elevation.gpkg")
+
+shape <- sf::st_read("BYshape/regbez_ex.shp") %>%
+ st_transform(st_crs(elevation))
+shapeBY <- sf::st_read("BYshape/bayern_ex.shp") %>%
+ st_transform(st_crs(elevation))
+
+
+test <- raster::extract(elevation, shape, fun=mean,na.rm=T)
+elevation1 <- elevatr::get_elev_raster(shapeBY, z = 1)
+
+elevation_by <- raster::extract(elevation1, shapeBY, fun=mean,na.rm=T)
+saveRDS(test, "data_rb_descriptive/elevation.rds")
+elevation <- readRDS("data_rb_descriptive/elevation.rds")
+
+## temp
+raster_temp_lt <- raster::raster("data_rb_descriptive/raster_temp_lt.gpkg")
+temp_lt_rb <- raster::extract(raster_temp_lt, shape, fun=mean,na.rm=T)
+temp_lt_by <- raster::extract(raster_temp_lt, shapeBY, fun=mean,na.rm=T)
+
+
+## temp
+raster_rain_lt <- raster::raster("data_rb_descriptive/raster_rain_lt.gpkg")
+rain_lt_rb <- raster::extract(raster_rain_lt, shape, fun=mean,na.rm=T)
+rain_lt_by <- raster::extract(raster_rain_lt, shapeBY, fun=mean,na.rm=T)
+```
+
+# SOil
+```{r}
+library(raster)
+path <- "C:/Users/ge36raw/Documents/Forschung/weather_tfp_nexus/calc/data/soil/"
+
+cec_raster <- raster(paste0(path, "chem/chem_data/CEC.tif"))
+pH_raster <- raster(paste0(path, "chem/chem_data/pH_CaCl.tif"))
+
+awc_raster <- raster(paste0(path, "physic/physic_data/AWC.tif"))
+coarse_frag_raster <- raster(paste0(path, 
+                                    "physic/physic_data/Coarse_fragments.tif"))
+
+
+shape <- st_transform(shape, st_crs(cec_raster))
+shapeBY <- st_transform(shapeBY, st_crs(cec_raster))
+
+cec_raster <- crop(cec_raster, shape)
+pH_raster <- crop(pH_raster, shape)
+awc_raster <- crop(awc_raster, shape)
+coarse_frag_raster <- crop(coarse_frag_raster, shape)
+
+
+cec <- raster::extract(cec_raster, shape, fun=mean,na.rm=T)
+pH <- raster::extract(pH_raster, shape, fun=mean,na.rm=T)
+awc <- raster::extract(awc_raster, shape, fun=mean,na.rm=T)
+coarse_frag <- raster::extract(coarse_frag_raster, shape, fun=mean,na.rm=T)
+
+
+cec_by <- raster::extract(cec_raster, shapeBY, fun=mean,na.rm=T)
+pH_by <- raster::extract(pH_raster, shapeBY, fun=mean,na.rm=T)
+awc_by <- raster::extract(awc_raster, shapeBY, fun=mean,na.rm=T)
+coarse_frag_by <- raster::extract(coarse_frag_raster, shapeBY, fun=mean,na.rm=T)
+```
+
+
+```{r}
+nat_conditions <- merge(rbind(
+ data.frame(rb=shape$BEZ_RBZ,
+            SCH=shape$SCH,
+            elevation=elevation, temp=temp_lt_rb, rain=rain_lt_rb),
+ 
+ data.frame(rb="Bayern",
+            SCH=shapeBY$SCH,
+            elevation=elevation_by, temp=temp_lt_by, rain=rain_lt_by)),
+rbind(
+ data.frame(rb=shape$BEZ_RBZ,
+            SCH=shape$SCH,
+            cec,pH,awc,coarse_frag),
+ 
+ data.frame(rb="Bayern",
+            SCH=shapeBY$SCH,
+            cec= cec_by,pH= pH_by,awc= awc_by,coarse_frag= coarse_frag_by)))
+
+nat_conditions <- nat_conditions[order(nat_conditions$SCH),]
+```
+
+# Yields
+```{r}
+yields <- rbind(
+yield_2016 <- read_excel("data_rb_descriptive/yields/yield_2016.xlsx", 
+    range = "A6:Q14") %>% 
+ mutate(year=2016),
+
+yield_2017 <- read_excel("data_rb_descriptive/yields/yield_2017.xlsx", 
+    range = "A6:Q14") %>% 
+ mutate(year=2017),
+
+yield_2018 <- read_excel("data_rb_descriptive/yields/yield_2018.xlsx", 
+    range = "A6:Q14") %>% 
+ mutate(year=2018),
+
+yield_2019 <- read_excel("data_rb_descriptive/yields/yield_2019.xlsx", 
+    range = "A6:Q14") %>% 
+ mutate(year=2019),
+
+yield_2020 <- read_excel("data_rb_descriptive/yields/yield_2020.xlsx", 
+    range = "A6:Q14") %>% 
+ mutate(year=2020),
+
+yield_2021 <- read_excel("data_rb_descriptive/yields/yield_2021.xlsx", 
+    range = "A6:Q14") %>% 
+ mutate(year=2021)
+) %>% 
+ filter(nchar(.[[1]]) < 4)
+
+colnames(yields)[1:2] <- c("SCH", "rb")
+yields[,3:17] <- sapply(3:17, function(i) as.numeric(yields[[i]]))
+
+aggregate(yields[,3:17], by=list(yields$SCH), mean) %>%
+ dplyr::select(2,6,15) %>% t
+```
+
+## Final district description table
+```{r}
+tab_rb <- matrix(NA, 26,8)
+
+# Structural conditions                     
+tab_rb[1,] <- round(gesamtflaeche2012$area_ha_tot/100/1000000, 1)
+tab_rb[2,] <- bevoelkerung$pop/gesamtflaeche2021$area_qkm_tot
+tab_rb[3,] <- waldflaechen$pecentage_forest*100
+tab_rb[4,] <- flaechennutzung$ha_total/gesamtflaeche2012$area_ha_tot*100*100
+tab_rb[5,] <- flaechennutzung$perc_crop * 100
+tab_rb[6,] <- flaechennutzung$perc_grassland * 100
+tab_rb[7,] <- tierbestand$lu_total/flaechennutzung$ha_total
+tab_rb[8,] <- with(eigentumsverhaeltnisse, rented/(own+rented))*100
+
+# farm size classes
+tab_rb[9:13, ] <- t(groessen[,-1])
+
+
+tab_rb[14,] <- eigentumsverhaeltnisse$rental_price
+tab_rb[15,] <- rechtsformen$percentage_full_time*100
+tab_rb[16,] <- hofnachfolge$percentage_yes*100
+
+# Natural conditions
+tab_rb[17,] <- nat_conditions$elevation
+tab_rb[18,] <- nat_conditions$temp
+tab_rb[19,] <- nat_conditions$rain
+
+tab_rb[20,] <- nat_conditions$cec
+tab_rb[21,] <- nat_conditions$pH
+tab_rb[22,] <- nat_conditions$awc
+tab_rb[23,] <- nat_conditions$coarse_frag
+
+# Yields
+tab_rb[24:26,] <- aggregate(yields[,3:17], by=list(yields$SCH), mean) %>%
+ dplyr::select(2,6,15) %>% t
+
+
+## round
+round_1 <- c(1:6, 8:16, 17, 19, 23:26)
+round_2 <- c(7, 18, 20:21)
+round_3 <- 22
+
+t_tab_rb <- as.data.frame(t(tab_rb))
+
+t_tab_rb[,round_1] <- sapply(round_1, function(i) round(t_tab_rb[,i], 1)) %>% 
+ as.character()
+t_tab_rb[,round_2] <- sapply(round_2, function(i) round(t_tab_rb[,i], 2)) %>% 
+ as.character()
+t_tab_rb[,round_3] <- sapply(round_3, function(i) round(t_tab_rb[,i], 3)) %>% 
+ as.character()
+
+
+tab_rb <- t(t_tab_rb)
+
+colnames(tab_rb) <- str_wrap(c("Bavaria",
+                      "Upper Bavaria",
+                      "Lower Bavaria",
+                      "Upper Palatinate",
+                      "Upper Franconia",
+                      "Central Franconia",
+                      "Lower Franconia",
+                      "Swabia"),8)
+
+rownames(tab_rb) <- c("Total area (mio. ha)",
+                      "Population density (residents/$km^2$)",
+                      "Share of forest area in total area (\\%)",
+                      "Share of agricultural land in total area (\\%)",
+                      "Share of arable land in agricultural land (\\%)",
+                      "Share of grassland in agricultural land (\\%)",
+                      "Livestock density (livestock units/ha agricultural land)",
+                      "Share of rented land (\\%)",
+                      
+                      "$<$ 10 ha",
+                      "$\\geq$ 10 ha $<$ 20 ha",
+                      "$\\geq$ 20 ha $<$ 50 ha",
+                      "$\\geq$ 50 ha $<$ 100 ha",
+                      "$\\geq$ 100",
+                      
+                      "Land prices (rental price in EUR/ha)",
+                      "Full-time farms (\\%)",
+                      "Generational renewal is secured (\\% of farms w/ farm manager's age $>$ 45)",
+
+                      "Elevation (m above sea level)",
+                      "Mean temperature 1960-2020 (°C)",
+                      "Yearly precipitation sum 1960-2020 (mm)",
+                      "Cation Exchange Capacity$^1$",
+                      "pH value of the soil",
+                      "Available water capacity ($m^3/m^3$)$^2$",
+                      "Coarse fragments (\\%)",
+                      
+                      "Wheat",
+                      "Grain maize",
+                      "Grassland"
+                      )
+```
+
+
+
+```{r}
+kb_tab <- kbl(tab_rb, caption = "Detailed overview of regional district charcteristics 
+              primarily based on Bavarian census data from 2010 and 2016.", 
+              booktabs = T, format = "latex",
+              label = "description_districts", escape = F) %>%
+ kable_styling(full_width = T,
+               font_size = 10) %>%
+ column_spec(1, width = "5cm") %>%
+ pack_rows("Structural conditions", 1, 16, indent = FALSE) %>%
+ pack_rows("Natural conditions", 17, 23, indent = FALSE, hline_before = T) %>%
+ pack_rows("Yields (dt/ha)", 24, 26, hline_before = T) %>% 
+ 
+ pack_rows("Size classes (Share of farms in %)", 9, 13, bold = FALSE) %>%
+  footnote(general_title = "", footnote_as_chunk = F,
+           general = "Sources: \\\\citet{StatistikBayern2022}, 
+           \\\\citet{Cornes2018},
+           \\\\citet{Panagos20012}",
+          number = c("Soil fertility indicator: soil's ability to supply important plant nutrients.", "Amount of water that can be stored in the soil and be available for growing crops."), escape = F)  %>%
+ save_kable("tables/rb_description.tex")
+
+```
+
+```{r}
+ggMap <- lapply(c("091", "092", "093", "094", "095", "096", "097"), function(i)
+ ggplot()+
+  geom_sf(data = shape, aes(fill = SCH),fill = "gray40", color = "gray12", 
+          size = 0.5, alpha=0.6) +
+  geom_sf(data = shape[startsWith(shape$SCH, i),], fill = "yellow",
+          color = "gray12") +
+  coord_sf(crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs ") +
+  theme_minimal(base_size = 30) +
+  theme(axis.text=element_blank()) +
+  ggtitle(if (i == "091") {
+   "Upper Bavaria"}
+   else if (i == "092") {
+    "Lower Bavaria"}
+   else if (i == "093") {
+    "Upper Palatinate"}
+   else if (i == "094") {
+    "Upper Franconia"}
+   else if (i == "095") {
+    "Central Franconia"}
+   else if (i == "096") {
+    "Lower Franconia"}
+   else if (i == "097" ) {
+    "Swabia"}))
+```
+
+```{r}
+tibble(
+ region = rep(NA, 7),
+ text = c(
+  "Large area, highest population density in Bavaria, high livestock density, 
+  small and medium sized farms dominate, more than 56% of farms are full-time,
+  for many farms, generational renewal is secured, mostly high altitude, 
+  high precipitation, average soil conditions, above-average yields.",
+  
+  "High share of agricultural land, in particular arable land, high land prices,
+  high share of full-time farms, average precipitation and temperature, 
+  good soil conditions, above-average yields.",
+  
+  "Highest share of forests in Bavaria, arable land dominates grassland, 
+  average farm size structure, below-average land prices, 
+  below-average temperature and rainfall, average yields.",
+  
+  "High share of rented farmland, high share of large farms, 
+  lowest land prices in Bavaria, many part-time farms, 
+  below-average temperature and rainfall, low yields.",
+  
+  "Arable farming is predominant, above-average share of rented farmland, 
+  many part-time farms, below-average share of full-time farms, 
+  high average temperature, lowest precipitation in Bavaria, below-average yields.",
+  
+  "High share of forests, crop farming centered, very low livestock density, 
+  highest share of rented land in Bavaria, fewest full-time farms and uncertain 
+  generational renewal for many farms, warmest district, below-average rainfall,
+  low yields.",
+  
+  "Lowest forest share, high share of grassland-based farming, high livestock 
+  density, very few large farms, high share of full-time farms, 
+  relatively high altitude, rather low temperatures and much rainfall,
+  region with highest yields."
+ )
+) %>%
+ gt() %>%
+ text_transform(
+  locations = cells_body(columns = region, rows = everything()),
+  fn = function(x) {
+   map(ggMap, ggplot_image, height = px(160))
+  }
+ ) %>% 
+ cols_width(
+  region ~ px(180),
+  text ~ px(600)
+ ) %>% 
+ cols_label(
+  text = 'Short characterization',
+  region = "District") %>% 
+ tab_style(
+  style = list(
+   "font-weight:bold;font-size:20px;"
+  ),
+  locations = cells_column_labels(c(region,text))
+ ) %>%
+ tab_style(
+  style = list(
+   "font-size:20px;"
+  ),
+  locations = cells_body(columns = everything(), rows = everything())
+ ) %>% 
+ gtsave("tables/tab_1.png")
+```
+
