@@ -54,11 +54,11 @@ sim_drought <- function(RegBez="091", shock_dur=1, extreme_year=2018,
                        0:10))
   
   weather_base_c_1_3 <- 
-    (df_sim %>% dplyr::filter(ID==RegBez) %>% select(ends_with("base30")) - c_1_3) %>% 
+    (df_sim %>% dplyr::filter(ID==RegBez) %>% select(ends_with("_base30")) - c_1_3) %>% 
     unlist
   
   weather_base_c_4_10 <- 
-    (df_sim %>% filter(ID==RegBez) %>% select(ends_with("base30")) - c_4_10) %>% 
+    (df_sim %>% filter(ID==RegBez) %>% select(ends_with("_base30")) - c_4_10) %>% 
     unlist
 
   if (extreme_year==2018) {
@@ -233,8 +233,12 @@ sim_drought <- function(RegBez="091", shock_dur=1, extreme_year=2018,
       3/7 * weather_drought_c_4_10 + 4/7 *weather_base_c_4_10  
     
     arrayXsim[1,endsWith(colnames(arrayXsim), "4_10_c1"), c(8:11)] <- 
-      arrayXsim[2,endsWith(colnames(arrayXsim), "4_10_c2"), c(8:11)] <- 
-      5/7 * weather_drought_c_4_10 + 2/7 *weather_base_c_4_10  
+     arrayXsim[2,endsWith(colnames(arrayXsim), "4_10_c2"), c(8:11)] <- 
+     4/7 * weather_drought_c_4_10 + 3/7 *weather_base_c_4_10  
+    
+    arrayXsim[1,endsWith(colnames(arrayXsim), "4_10_c1"), c(9:11)] <- 
+     arrayXsim[2,endsWith(colnames(arrayXsim), "4_10_c2"), c(9:11)] <- 
+     5/7 * weather_drought_c_4_10 + 2/7 *weather_base_c_4_10  
   } 
   
  result <- lapply(1:11, function (y)

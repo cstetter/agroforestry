@@ -18,6 +18,7 @@ source("SimDroughtFunApp.R")  # Source a custom R script
 df_sim <- readRDS("data/df_sim.rds")  # Load simulated data
 
 # Load a model result
+# resCR25cor <- readRDS("models/res_cor_13_410.rds")  # Load a model result
 resCR25cor <- readRDS("models/models_new/res_cor_13_410.rds")  # Load a model result
 
 # Load more data
@@ -345,96 +346,95 @@ lapply(1:5, function(i)
         width = 9, height = 12))
 
 
-#### test gganimate ####
-library(gganimate)
-p <-  gg_shock_scenario2003 +
- transition_reveal(as.integer(year)) + 
- view_follow(fixed_y = TRUE, fixed_x = TRUE)+
- coord_cartesian(clip = 'off') 
-
-animate(p, width = 900, height = 250, renderer = gifski_renderer(), fps=5)
-a <- animate(p, width = 900, height = 900, renderer = av_renderer(), fps=5)
-anim_save("img/animation.mp4", a)
-
-
-
-#### ANL Artikel ####
-for (y in c("y2003", "y2018")) {
- df_worst_case[[y]][[1]]$shock <- df_worst_case_policy_supp[[y]][[1]]$shock <- 
-  df_worst_case_min_nd[[y]][[1]]$shock <- df_mid_case[[y]][[1]]$shock <- 
-  df_best_case[[y]][[1]]$shock <- "1 Extremjahr"
-}
-
-for (y in c("y2003", "y2018")) {
- for (i in 2:5) {
-  df_worst_case[[y]][[i]]$shock <- df_worst_case_policy_supp[[y]][[i]]$shock <- 
-   df_worst_case_min_nd[[y]][[i]]$shock <- df_mid_case[[y]][[i]]$shock <- 
-   df_best_case[[y]][[i]]$shock <- paste0(i, " aufeinanderfolgende\nExtremjahre")
- }
-}
-
-
-dt_shock_scenarios <- 
- lapply(c("y2003", "y2018"), function(y)
-  do.call(rbind, df_worst_case[[y]]) %>%
-   mutate(RegBez = factor(RegBez,
-                          levels = c( "09", "091", "092", "093", 
-                                      "094", "095", "096", "097"),
-                          labels = str_wrap(c("Bayern",
-                                              "Upper Bavaria",
-                                              "Lower Bavaria",
-                                              "Upper Palatinate",
-                                              "Upper Franconia",
-                                              "Middle Franconia",
-                                              "Lower Franconia",
-                                              "Swabia"), 10)),
-          name=ifelse(name=="p_shock", "Shocked", "Baseline")) %>%
-   filter(RegBez=="Bayern")
- )
-
-
-dt_shock_scenarios[[1]]$SimYear <- "2003-Wetterereignis"
-dt_shock_scenarios[[2]]$SimYear <- "2018-Wetterereignis"
-
-dt <- do.call(rbind, dt_shock_scenarios)
-
-dt$name <- with(dt, ifelse(name=="Shocked", "Nach Wetterschock",
-                           name))
-
-
-dat_rect <- data.frame(
- shock = rep(unique(dt$shock)[c(1:5)],2),
- scenario = rep(unique(dt$SimYear), each=5),
- xmin = 0,
- xmax = rep( c(0.5, 1.5, 2.5, 3.5, 4.5), 2),
- ymin = 0,
- ymax = Inf)
-
-ggplot(dt, aes(x=year, y=value)) +
- geom_line(aes(col=ALT, lty=name, alpha=name), size=0.9) +
- facet_grid(SimYear~shock) +
- scale_x_continuous(expand = c(0, 0),
-                    breaks = seq(0, 10, by = 1)) +
- geom_rect(
-  data    = dat_rect,
-  mapping = aes(xmin = xmin,
-                xmax = xmax,
-                ymin = ymin,
-                ymax = ymax), alpha = 0.1, fill="firebrick", inherit.aes = FALSE)+
- theme(panel.grid.minor.x = element_blank(),
-       panel.spacing.x = unit(0.9, "lines"),
-       panel.spacing.y = unit(0.5, "lines"),
-       legend.position = "bottom",
-       legend.key.size = unit(2,"line")) +
- labs(x="Jahr (nach Eintreten v. Extremwettereignis)",
-      y="Durchschnittl. Anbauwahrscheinlichkeit",
-      colour="Landnutzungssystem", 
-      lty="Szenario") +
- scale_linetype_manual(values = c("Baseline" = "dashed", "Nach Wetterschock" = "solid")) +
- scale_color_manual(values = c("darkorange1", "dodgerblue1", "forestgreen"), 
-                    labels = c("Alley Cropping", "Kurzumtriebsplantage", "Ackerbau")) +
- scale_alpha_manual(values = c("Baseline" = 0.66, "Nach Wetterschock" = 1))+
- guides(colour = guide_legend(title.position = "top", title.align=0.5),
-        linetype=guide_legend(title.position = "top"),
-        alpha = "none")
-
+# #### test gganimate ####
+# library(gganimate)
+# p <-  gg_shock_scenario2003 +
+#  transition_reveal(as.integer(year)) + 
+#  view_follow(fixed_y = TRUE, fixed_x = TRUE)+
+#  coord_cartesian(clip = 'off') 
+# 
+# a <- animate(p, width = 900, height = 900, renderer = av_renderer(), fps=5)
+# anim_save("img/animation.mp4", a)
+# 
+# 
+# 
+# #### ANL Artikel ####
+# for (y in c("y2003", "y2018")) {
+#  df_worst_case[[y]][[1]]$shock <- df_worst_case_policy_supp[[y]][[1]]$shock <- 
+#   df_worst_case_min_nd[[y]][[1]]$shock <- df_mid_case[[y]][[1]]$shock <- 
+#   df_best_case[[y]][[1]]$shock <- "1 Extremjahr"
+# }
+# 
+# for (y in c("y2003", "y2018")) {
+#  for (i in 2:5) {
+#   df_worst_case[[y]][[i]]$shock <- df_worst_case_policy_supp[[y]][[i]]$shock <- 
+#    df_worst_case_min_nd[[y]][[i]]$shock <- df_mid_case[[y]][[i]]$shock <- 
+#    df_best_case[[y]][[i]]$shock <- paste0(i, " aufeinanderfolgende\nExtremjahre")
+#  }
+# }
+# 
+# 
+# dt_shock_scenarios <- 
+#  lapply(c("y2003", "y2018"), function(y)
+#   do.call(rbind, df_worst_case[[y]]) %>%
+#    mutate(RegBez = factor(RegBez,
+#                           levels = c( "09", "091", "092", "093", 
+#                                       "094", "095", "096", "097"),
+#                           labels = str_wrap(c("Bayern",
+#                                               "Upper Bavaria",
+#                                               "Lower Bavaria",
+#                                               "Upper Palatinate",
+#                                               "Upper Franconia",
+#                                               "Middle Franconia",
+#                                               "Lower Franconia",
+#                                               "Swabia"), 10)),
+#           name=ifelse(name=="p_shock", "Shocked", "Baseline")) %>%
+#    filter(RegBez=="Bayern")
+#  )
+# 
+# 
+# dt_shock_scenarios[[1]]$SimYear <- "2003-Wetterereignis"
+# dt_shock_scenarios[[2]]$SimYear <- "2018-Wetterereignis"
+# 
+# dt <- do.call(rbind, dt_shock_scenarios)
+# 
+# dt$name <- with(dt, ifelse(name=="Shocked", "Nach Wetterschock",
+#                            name))
+# 
+# 
+# dat_rect <- data.frame(
+#  shock = rep(unique(dt$shock)[c(1:5)],2),
+#  scenario = rep(unique(dt$SimYear), each=5),
+#  xmin = 0,
+#  xmax = rep( c(0.5, 1.5, 2.5, 3.5, 4.5), 2),
+#  ymin = 0,
+#  ymax = Inf)
+# 
+# ggplot(dt, aes(x=year, y=value)) +
+#  geom_line(aes(col=ALT, lty=name, alpha=name), size=0.9) +
+#  facet_grid(SimYear~shock) +
+#  scale_x_continuous(expand = c(0, 0),
+#                     breaks = seq(0, 10, by = 1)) +
+#  geom_rect(
+#   data    = dat_rect,
+#   mapping = aes(xmin = xmin,
+#                 xmax = xmax,
+#                 ymin = ymin,
+#                 ymax = ymax), alpha = 0.1, fill="firebrick", inherit.aes = FALSE)+
+#  theme(panel.grid.minor.x = element_blank(),
+#        panel.spacing.x = unit(0.9, "lines"),
+#        panel.spacing.y = unit(0.5, "lines"),
+#        legend.position = "bottom",
+#        legend.key.size = unit(2,"line")) +
+#  labs(x="Jahr (nach Eintreten von Extremwettereignis)",
+#       y="Durchschnittliche \nAnbauwahrscheinlichkeit",
+#       colour="Landnutzungssystem", 
+#       lty="Szenario") +
+#  scale_linetype_manual(values = c("Baseline" = "dashed", "Nach Wetterschock" = "solid")) +
+#  scale_color_manual(values = c("darkorange1", "dodgerblue1", "forestgreen"), 
+#                     labels = c("Alley Cropping", "Kurzumtriebsplantage", "Ackerbau")) +
+#  scale_alpha_manual(values = c("Baseline" = 0.66, "Nach Wetterschock" = 1))+
+#  guides(colour = guide_legend(title.position = "top", title.align=0.5),
+#         linetype=guide_legend(title.position = "top"),
+#         alpha = "none")
+# 

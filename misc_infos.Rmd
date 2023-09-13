@@ -80,7 +80,7 @@ tab <- kbl(tb_, booktabs = T, format = "latex",
   # pack_rows("Middle Franconia", 16, 18) %>%
   # pack_rows("Lower Franconia", 19, 21) %>%
   # pack_rows("Swabia", 22, 24) %>%
-kable_styling(full_width = T, ,font_size = 10) %>%
+kable_styling(full_width = T, latex_options = "hold_position",font_size = 10) %>%
 column_spec(1, width = "4.8cm")
 
 save_kable(tab, "tables/sim_summary.tex", keep_tex = F)
@@ -111,7 +111,7 @@ mat_s <- data.frame(
 )
 
 colnames(mat_s) <- c("Scenario", 
-                     rep(c("MC", "MC V", "MU L", "PE S", "Gre-en"), 3))
+                     rep(c("MC", "MC V", "MU L", "AE P", "Gre-en"), 3))
 ```
 
 
@@ -120,14 +120,14 @@ tab <- kbl(mat_s, booktabs = T, format = "latex",
            label = "des_sim_scenarios",
            caption = "Description of the simulation scenarios and corresponding attribute values.",
            escape = FALSE)  %>%
- kable_styling(full_width = T, font_size =10) %>%
+ kable_styling(full_width = T, font_size =10, latex_options = "hold_position") %>%
  column_spec(1, width = "3cm") %>%
  add_header_above(c(" " = 1, "Alley-Cropping" = 5, "Short Rotation Coppice" = 5, 
                     "Status Quo" = 5))  %>% 
  footnote(general_title = "", footnote_as_chunk = T,
           general = "area eligible for greening premium")  %>%
  footnote(general_title = "", footnote_as_chunk = T,
-          general = "useful lifetime (years), PES = Payments for environmental services (Euro), Green = Cultivated") %>%
+          general = "useful lifetime (years), AEP = Agri-environmental payments (Euro), Green = Cultivated") %>%
  footnote(general_title = "Note:", footnote_as_chunk = T,
           # threeparttable = TRUE,
           general = "MC = Margin contribution (Euro), MCV = margin contribution variation (%), MUL = Minimum ") 
@@ -137,78 +137,17 @@ save_kable(tab, "tables/sim_scenarios.tex", keep_tex = F)
 
 
 
-```{r map}
-library(sf)
-library(spData)
-library(ggplot2)
-library(cowplot)
-library(rcartocolor)
-
-
-Bshape <- st_union(BYshape)
-b <- st_bbox(Bshape)
-
-p1 <-ggplot()+
-  geom_sf(data = EUmap, fill = NA, 
-          size = 0.5)  +
-  geom_sf(data = Bshape, size = 0.2, alpha=0.1) +
-  scale_color_viridis_c() +
- annotate("rect", xmin = b["xmin"], xmax = b["xmax"], ymin = b["ymin"], ymax = b["ymax"],
-           colour = "black", fill = "transparent", size = 1) +
-  geom_sf_text(
-   data = EUmap[EUmap$NUTS_ID %in% c("DE", "ES", "FR", "IT", "NL", "PL", "SE", "UK"),], 
-   aes(label = NUTS_ID), size=3.5 ) +
- theme_void(base_size = 16) +
-  theme(axis.text = element_blank(),
-        panel.background = element_rect(size = 0.6)) 
-
-ByCrop <- st_union(st_crop(EUmap, b))
-
-p2 <- ggplot()+
- geom_sf(data = BYshape, aes(fill=SCH), alpha=0.4, color="black") +
- geom_sf(data = ByCrop, fill = NA, color="black", size=1)  +
- scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0)) +
- scale_color_viridis_c() +
- theme_void(base_size = 16)  +
- theme(axis.text = element_blank(),
-       legend.position = "bottom",
-       legend.direction = 'vertical') +
- guides(fill = guide_legend(title = "District",
-                            title.position = "top", title.align=0.5,
-                            label.position = "bottom", size=1.5, nrow = 3)) +
- scale_fill_manual(values=brewer.pal(n=7, "Dark2"),
-                   labels =str_wrap(c("Upper Bavaria",
-                             "Lower Bavaria",
-                             "Upper Palatinate",
-                             "Upper Franconia",
-                             "Middle Franconia",
-                             "Lower Franconia",
-                             "Swabia")), 10)+
- ggtitle("Bavaria")
-
-
-# map
-gg_inset_map1 = cowplot::ggdraw() +
-  coord_equal(xlim = c(0, 40), ylim = c(0, 20), expand = FALSE) +
-  annotation_custom(ggplotGrob(p1), xmin = 0, xmax = 20, ymin = 0, ymax =20) +
-  annotation_custom(ggplotGrob(p2), xmin = 23, xmax = 40, ymin = 0, ymax = 20) +
-  geom_segment(aes(x = 11.3, xend = 26, y = 8.7, yend = 18.7), color = "black", size = 1.2) +
-  geom_segment(aes(x = 11.3, xend = 26, y = 7.12, yend = 7.45), color = "black", size = 1.2)
-
-ggsave(filename = paste0("img/bavaria_map.png"), 
-       plot = gg_inset_map1, dpi="print",
-       width = 14, height = 6)
-```
-
-
 # Load models
 ```{r}
-file_list <- list.files("models", full.names = T)[-1]
+# file_list <- list.files("models/models_new", full.names = T)
 
-res_list <- lapply(file_list, function(i) readRDS(file = i))
-names(res_list) <- stringr::str_sub(
- list.files("models", full.names = F)[-1], 1,-5)
+res_list <- readRDS("models/models_new/res_list_cor_12.rds")
+# names(res_list) <- stringr::str_sub(names(res_list), 3,-1)
+res_cor_13_410 <- readRDS("models/models_new/res_cor_13_410.rds")
+res_mnl_13_410 <- readRDS("models/models_new/res_mnl_13_410.rds")
+res_uncor_13_410 <- readRDS("models/models_new/res_uncor_13_410.rds")
 
+res_cor_13_410_noW <- readRDS("models/models_new/res_cor_13_410_noW.rds")
 list2env(res_list,globalenv())
 ```
 
@@ -218,12 +157,10 @@ list2env(res_list,globalenv())
 library(broom)
 library(tidyverse)
 
+
+# Main model
 res_cor_13_410_vcov <- 
  summary(vcov(res_cor_13_410, what = "rpar", type = "cor"))
-
-res_cor_base_13_410_vcov <- 
- summary(vcov(res_cor_base_13_410, what = "rpar", type = "cor"))
-
 
 res_cor_13_410_tidy <- rbind(
  tidy(res_cor_13_410),
@@ -234,28 +171,32 @@ res_cor_13_410_tidy <- rbind(
  filter(substr(term,1,1) != "c")
 res_cor_13_410_tidy[,2:5] <- sapply(res_cor_13_410_tidy[,2:5], as.numeric)
 
-
+# Correlated no weather
+res_cor_13_410_noW_vcov <- 
+ summary(vcov(res_cor_13_410_noW, what = "rpar", type = "cor"))
 
 res_cor_base_13_410_tidy <- rbind(
- tidy(res_cor_base_13_410),
+ tidy(res_cor_13_410_noW ),
  setNames(
-  as.tibble(cbind(rownames(res_cor_base_13_410_vcov),
-                  res_cor_base_13_410_vcov[,1:4])), 
-  names(tidy(res_cor_base_13_410)))) %>%
+  as.tibble(cbind(rownames(res_cor_13_410_noW_vcov),
+                  res_cor_13_410_noW_vcov[,1:4])),
+  names(tidy(res_cor_13_410_noW )))) %>%
  filter(substr(term,1,1) != "c")
 res_cor_base_13_410_tidy[,2:5] <- sapply(res_cor_base_13_410_tidy[,2:5], as.numeric)
 
-
+# Conditional logit
 res_mnl_13_410_tidy <- tidy(res_mnl_13_410)
+
+# Uncorrelated
 res_uncor_13_410_tidy <- tidy(res_uncor_13_410)
 
 broom_glance <- function(res_object, cor){
  glance(res_object)  %>%
-  dplyr::select(logLik, rho2, AIC, nobs)
+  dplyr::select(logLik, rho2, nobs)
 }
 
 res_mnl_13_410_glance <- broom_glance(res_object = res_mnl_13_410)
-res_cor_base_13_410_glance <- broom_glance(res_object = res_cor_base_13_410)
+res_cor_base_13_410_glance <- broom_glance(res_object = res_cor_13_410_noW)
 res_uncor_13_410_glance <- broom_glance(res_object = res_uncor_13_410)
 res_cor_13_410_glance <- broom_glance(res_object = res_cor_13_410)
 
@@ -269,7 +210,7 @@ texreg::createTexreg(coef.names = tidy$term,
                      pvalues = tidy$p.value,
                      gof.names = names(glance),
                      gof = t(glance)[,1],
-                     gof.decimal = c(rep(TRUE,4)))
+                     gof.decimal = c(rep(TRUE,3)))
 }
 
 coef_names <- list(
@@ -278,7 +219,7 @@ coef_names <- list(
  "DB"               = "Returns",
  "DBVar"            = "Returns variability",
  "ND"               = "Min. useful lifet.",
- "AU"               = "PES", 
+ "AU"               = "Agri-env. payments", 
  "No"               = "No greening",
  "rain_1_3_c:1"     = "Rain 1-3:SRC",
  "rain_1_3_c:2"     = "Rain 1-3:AC",
@@ -333,27 +274,29 @@ coef_names <- list(
 library("texreg")
 model_out <- texreg(
  list(extract_broom(res_mnl_13_410_tidy, res_mnl_13_410_glance),
-      # extract_broom(res_cor_base_13_410_tidy, res_cor_base_13_410_glance),
+      extract_broom(res_cor_base_13_410_tidy, res_cor_base_13_410_glance),
       extract_broom(res_uncor_13_410_tidy, res_uncor_13_410_glance),
       extract_broom(res_cor_13_410_tidy, res_cor_13_410_glance)
  ),
- custom.gof.rows = list("Correlation"=c("-", "No", "Yes"),
-                        " " = c(" ", " ",  " ")),
- custom.gof.names = c(NA, "Pseudo-R2", NA, "Obs."),
+ custom.gof.rows = list("Correlation"=c("-\\hspace{0.1\\textwidth}", "Yes\\hspace{0.1\\textwidth}",
+                                        "No\\hspace{0.1\\textwidth}", "Yes\\hspace{0.1\\textwidth}"),
+                        " " = c(" ", " ",  " ", " ")),
+ custom.gof.names = c(NA, "Pseudo-R2", "Obs."),
  file = "tables/reg_table.tex", 
  single.row = T, 
- fontsize = "footnotesize",
+ fontsize = "scriptsize",
  use.packages=FALSE, 
  booktabs = T, 
  siunitx = T, 
  center = T, 
- no.margin = F,
+ no.margin = T,
  custom.coef.map = coef_names,
  groups = list("\\textbf{Means}" = 1:27, "\\textbf{Standard deviations}" = 28:54), 
  stars = c(0.001, 0.01, 0.05, 0.1),
  symbol = "\\circ",
  label = "tab:estimation_results",
- custom.model.names = c("MNL", "uncor. RPL", "cor. RPL"),
+ custom.model.names = c("Model 1\\hspace{0.07\\textwidth}", "Model 2\\hspace{0.07\\textwidth}",
+                        "Model 3\\hspace{0.07\\textwidth}", "Model 4\\hspace{0.07\\textwidth}"),
  caption = "Estimation results summary.",
  caption.above = TRUE
  )
@@ -369,7 +312,7 @@ c("ASC: SRC",
   "Returns",
   "Returns variability",
   "Min. useful lifet.",
-  "PES", 
+  "Agi-env. payments", 
   "No greening")
 
 
@@ -386,7 +329,10 @@ save_kable(tab, "tables/cor_matrix.tex", keep_tex = F)
 # Robustness checks
 
 ```{r}
-rob_list <- res_list[grepl("CR25", names(res_list))]
+rob_list <- res_list[grepl("m", names(res_list))]
+
+
+rob_list <- rob_list[names(rob_list)!= "m_13_410"]
 
 tab_rob_lags <- as_tibble( 
  cbind(
@@ -397,15 +343,20 @@ sapply(rob_list, glance)[c(1:2,4),])
 tab_rob_lags <- round(sapply(tab_rob_lags, as.numeric), 2)
 
 names_lags <- 
- c("\\textbf{Selected Model} short-term: 1-3 years,\nlong-term: 4-10 years",
-   "\\textbf{Specification Alt. 1} short-term: 1 year, long-term: 2-10 years",
-   "\\textbf{Specification Alt. 2} short-term: 1 year, long-term: 2-15 years",
-   "\\textbf{Specification Alt. 3} short-term: 1 year, long-term: 2-20 years",
-   "\\textbf{Specification Alt. 4} short-term: 1-3 year, long-term: 4-15 years",
-   "\\textbf{Specification Alt. 5} short-term: 1-3 year, long-term: 4-20 years",
-   "\\textbf{Specification Alt. 6} short-term: 1-5 year, long-term: 6-10 years",
-   "\\textbf{Specification Alt. 7} short-term: 1-5 year, long-term: 6-15 years",
-   "\\textbf{Specification Alt. 8} short-term: 1-5 year, long-term: 6-20 years")
+ c(
+  "\\textbf{Selected Model} short-term: 1-3 years,\nlong-term: 4-10 years",
+  "\\textbf{Specification Alt. 1} short-term: 1 year, long-term: 2-10 years",
+  "\\textbf{Specification Alt. 2} short-term: 1 year, long-term: 2-15 years",
+  "\\textbf{Specification Alt. 3} short-term: 1 year, long-term: 2-20 years",
+  "\\textbf{Specification Alt. 4} short-term: 1 year, long-term: 2-25 years",
+  "\\textbf{Specification Alt. 5} short-term: 1-3 year, long-term: 4-15 years",
+  "\\textbf{Specification Alt. 6} short-term: 1-3 year, long-term: 4-20 years",
+  "\\textbf{Specification Alt. 7} short-term: 1-3 year, long-term: 4-25 years",
+  "\\textbf{Specification Alt. 8} short-term: 1-5 year, long-term: 6-10 years",
+  "\\textbf{Specification Alt. 9} short-term: 1-5 year, long-term: 6-15 years",
+  "\\textbf{Specification Alt. 10} short-term: 1-5 year, long-term: 6-20 years",
+  "\\textbf{Specification Alt. 11} short-term: 1-5 year, long-term: 6-25 years"
+ )
 
 colnames(tab_rob_lags) <- names_lags
 
@@ -481,8 +432,8 @@ row.names(tab_descriptive) <-c("Full-time farming (1 if yes, 0 otherwise)",
                                "Share of grassland (\\%)",
                                "Share of forested land (\\%)",
                                "Share of rented land (\\%)",
+                               "Organic (1 if yes, 0 otherwise)",
                                "Workforce (AWU\\textsuperscript{a})",
-                               "Full-time farming (1 if yes, 0 otherwise)",
                                "Farmer's age (years)",
                                "Higher education (1 if yes, 0 otherwise)\\textsuperscript{b}",
                                "Participation in agri-environmental program (1 if yes, 0 otherwise)")
@@ -505,7 +456,8 @@ tab <- kbl(tab_descriptive,
           escape = F, threeparttable = F) %>%
  footnote(general_title = "", footnote_as_chunk = T,escape = F,
           threeparttable = F,
-          general = "\\\\footnotesize{Note: Number of observations = 198; a AWU denotes annual working units. b Higher education refers}")
+          general = "\\\\footnotesize{Note: Number of observations = 198; a AWU denotes annual working units. b Higher education refers}") %>% 
+ kable_styling(latex_options = "HOLD_position")
 
  save_kable(tab, "tables/tab_descriptive.tex", keep_tex = T)
 ```
@@ -985,3 +937,117 @@ tibble(
  gtsave("tables/tab_1.png")
 ```
 
+# Bavaria map
+```{r}
+## shape
+shape <- st_read("C:/Users/cstetter/OneDrive - ETH Zurich/01_save_d/weather_data/choice_data/bayern_ex.shp")
+
+## Geometry and administrative units
+RPshape <- sf::st_read("C:/Users/cstetter/OneDrive - ETH Zurich/01_save_d/weather_data/choice_data/regbez_ex.shp")[,"SCH"]
+LKshape <- sf::st_read("C:/Users/cstetter/OneDrive - ETH Zurich/01_save_d/weather_data/choice_data/lkr_ex.shp")[,"SCH"] %>%
+ sf::st_transform(sf::st_crs(RPshape))
+
+shape <- sf::st_transform(shape, sf::st_crs(RPshape))
+
+EUmap <- sf::st_read("C:/Users/cstetter/OneDrive - ETH Zurich/01_save_d/weather_data/NUTS_RG_03M_2013_3857_LEVL_0.shp")
+EUmap <- sf::st_transform(EUmap, sf::st_crs(RPshape))
+EUmap <- sf::st_crop(sf::st_make_valid(EUmap), 
+                 xmin = -15.83454, ymin = 34.80251, 
+                 xmax = 34.58835, ymax = 70.09209)    
+                      
+b <- st_bbox(shape)
+plot1 <- ggplot()+
+  geom_sf(data = EUmap, fill = NA, 
+          size = 0.5)  +
+  geom_sf(data = shape, size = 0.2, alpha=0.1, fill="gray12") +
+ annotate("rect", xmin = b["xmin"], xmax = b["xmax"], ymin = b["ymin"], ymax = b["ymax"],
+           colour = "black", fill = "transparent", size = 1) +
+  geom_sf_text(
+   data = EUmap, 
+   aes(label = NUTS_ID), size=3.5 ) +
+ theme_void(base_size = 12) +
+ xlim(-15.83454, 100) 
+
+
+plot2 <- ggplot()+
+  geom_sf(data = RPshape, lwd = 0.1, col="gray12", fill=NA) +
+  geom_sf(data = shape, lwd = 1.1, alpha=0.1,  col="black") +
+ theme_void() +
+ theme(axis.text = element_blank(),
+        panel.background = element_rect(size = 0.6))
+
+
+ggGeo <-plot1 +
+annotation_custom(ggplotGrob(plot2), xmin = 45, xmax = 95, ymin = -Inf, ymax = Inf) +
+ annotate("segment", x = 14, xend = 45, y = 47.3, yend = 37.5, colour = "black") +
+ annotate("segment", x = 14, xend = 45, y = 50.6, yend = 68.75, colour = "black") +
+ theme_void(base_size = 12)
+
+ggsave(filename = paste0("img/bavaria_map.png"), 
+       plot = ggGeo, dpi="print",
+       width = 14, height = 6)
+```
+
+
+```{r map, eval=FALSE, include=FALSE}
+library(sf)
+library(spData)
+library(ggplot2)
+library(cowplot)
+library(rcartocolor)
+
+
+Bshape <- st_union(BYshape)
+b <- st_bbox(Bshape)
+
+p1 <-ggplot()+
+  geom_sf(data = EUmap, fill = NA, 
+          size = 0.5)  +
+  geom_sf(data = Bshape, size = 0.2, alpha=0.1) +
+  scale_color_viridis_c() +
+ annotate("rect", xmin = b["xmin"], xmax = b["xmax"], ymin = b["ymin"], ymax = b["ymax"],
+           colour = "black", fill = "transparent", size = 1) +
+  geom_sf_text(
+   data = EUmap[EUmap$NUTS_ID %in% c("DE", "ES", "FR", "IT", "NL", "PL", "SE", "UK"),], 
+   aes(label = NUTS_ID), size=3.5 ) +
+ theme_void(base_size = 16) +
+  theme(axis.text = element_blank(),
+        panel.background = element_rect(size = 0.6)) 
+
+ByCrop <- st_union(st_crop(EUmap, b))
+
+p2 <- ggplot()+
+ geom_sf(data = BYshape, aes(fill=SCH), alpha=0.4, color="black") +
+ geom_sf(data = ByCrop, fill = NA, color="black", size=1)  +
+ scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0)) +
+ scale_color_viridis_c() +
+ theme_void(base_size = 16)  +
+ theme(axis.text = element_blank(),
+       legend.position = "bottom",
+       legend.direction = 'vertical') +
+ guides(fill = guide_legend(title = "District",
+                            title.position = "top", title.align=0.5,
+                            label.position = "bottom", size=1.5, nrow = 3)) +
+ scale_fill_manual(values=brewer.pal(n=7, "Dark2"),
+                   labels =str_wrap(c("Upper Bavaria",
+                             "Lower Bavaria",
+                             "Upper Palatinate",
+                             "Upper Franconia",
+                             "Middle Franconia",
+                             "Lower Franconia",
+                             "Swabia")), 10)+
+ ggtitle("Bavaria")
+
+
+# map
+gg_inset_map1 = cowplot::ggdraw() +
+  coord_equal(xlim = c(0, 40), ylim = c(0, 20), expand = FALSE) +
+  annotation_custom(ggplotGrob(p1), xmin = 0, xmax = 20, ymin = 0, ymax =20) +
+  annotation_custom(ggplotGrob(p2), xmin = 23, xmax = 40, ymin = 0, ymax = 20) +
+  geom_segment(aes(x = 11.3, xend = 26, y = 8.7, yend = 18.7), color = "black", size = 1.2) +
+  geom_segment(aes(x = 11.3, xend = 26, y = 7.12, yend = 7.45), color = "black", size = 1.2)
+
+ggsave(filename = paste0("img/bavaria_map.png"), 
+       plot = gg_inset_map1, dpi="print",
+       width = 14, height = 6)
+```

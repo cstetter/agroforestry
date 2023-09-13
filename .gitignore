@@ -41,3 +41,17 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+.Rproj.user
+
+# Data
+BYshape/
+dashboard/
+data/
+data_field/
+data_projections/
+data_rb_descriptive/
+DWDdata/
+misc/
+models/
+plz_data/
+plz_spatial/
